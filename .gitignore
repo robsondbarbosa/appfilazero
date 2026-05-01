@@ -1,0 +1,30 @@
+# Projetos individuais (cada um tem seu próprio repositório)
+techboard/
+gympro/
+gym-manager/
+gym-manager-pro/
+atendimento-tecnico/
+
+# Dependências
+node_modules/
+
+# Logs
+*.log
+logs/
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Vercel
+.vercel
+
+# Ambiente
+.env
+.env.local
