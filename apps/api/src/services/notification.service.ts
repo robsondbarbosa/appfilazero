@@ -162,7 +162,7 @@ export class NotificationService {
 
     let message = `⏰ *Lembrete de Agendamento*\n\n`;
     message += `Olá ${clientName.split(' ')[0]}!\n\n`;
-    message += `Passando para lembrar do seu agendamento amanhã:\n\n`;
+    message += `Passando para lembrar que seu agendamento é *em 2 horas*:\n\n`;
     message += `📋 *Serviço:* ${serviceName}\n`;
     message += `💇‍♂️ *Profissional:* ${professionalName}\n`;
     message += `📅 *Data:* ${formatDateTime(dateTime)}\n`;

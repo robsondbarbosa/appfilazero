@@ -75,24 +75,22 @@ export async function cancelExpiredAppointments(): Promise<void> {
 }
 
 /**
- * Envia lembretes de agendamento 24h antes
+ * Envia lembretes de agendamento 2h antes
  */
 export async function sendAppointmentReminders(): Promise<void> {
   try {
     console.log('[Cron] Enviando lembretes de agendamento...');
     
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-    
-    const nextDay = new Date(tomorrow);
-    nextDay.setDate(nextDay.getDate() + 1);
+    const now = new Date();
+    const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    const threeHoursFromNow = new Date(now.getTime() + 3 * 60 * 60 * 1000);
     
     const appointmentsSnapshot = await adminDb
       .collection('appointments')
       .where('status', '==', 'CONFIRMED')
-      .where('dateTime', '>=', tomorrow)
-      .where('dateTime', '<', nextDay)
+      .where('dateTime', '>=', twoHoursFromNow)
+      .where('dateTime', '<', threeHoursFromNow)
+      .where('reminderSent', '!=', true)
       .get();
     
     console.log(`[Cron] ${appointmentsSnapshot.size} lembretes para enviar`);
