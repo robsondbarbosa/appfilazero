@@ -13,9 +13,11 @@ import {
   LogOut,
   Plus,
   ChevronRight,
-  Bell
+  Bell,
+  Loader2
 } from 'lucide-react'
-import { auth } from '@filazero/firebase/client'
+import { auth, db } from '@filazero/firebase/client'
+import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore'
 
 interface DashboardStats {
   todayAppointments: number
@@ -61,34 +63,51 @@ export default function DashboardPage() {
 
   const loadDashboardData = async () => {
     try {
-      // Simular dados - em produção viria da API
-      setStats({
-        todayAppointments: 8,
-        weekRevenue: 2450,
-        totalClients: 156,
-        occupancyRate: 78
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const tomorrow = new Date(today)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+
+      // Buscar agendamentos de hoje
+      const appointmentsQuery = query(
+        collection(db, 'appointments'),
+        where('dateTime', '>=', Timestamp.fromDate(today)),
+        where('dateTime', '<', Timestamp.fromDate(tomorrow))
+      )
+
+      const appointmentsSnapshot = await getDocs(appointmentsQuery)
+      const appointments: Appointment[] = []
+      
+      appointmentsSnapshot.forEach((doc) => {
+        const data = doc.data()
+        appointments.push({
+          id: doc.id,
+          clientName: data.clientName,
+          serviceName: data.serviceName || 'Serviço',
+          professionalName: data.professionalName || 'Profissional',
+          dateTime: data.dateTime.toDate(),
+          status: data.status,
+          price: data.price || 0
+        })
       })
 
-      setTodayAppointments([
-        {
-          id: '1',
-          clientName: 'João Silva',
-          serviceName: 'Corte + Barba',
-          professionalName: 'Carlos',
-          dateTime: new Date(),
-          status: 'CONFIRMED',
-          price: 60
-        },
-        {
-          id: '2',
-          clientName: 'Maria Santos',
-          serviceName: 'Coloração',
-          professionalName: 'Ana',
-          dateTime: new Date(),
-          status: 'PENDING',
-          price: 150
-        }
-      ])
+      setTodayAppointments(appointments)
+
+      // Calcular stats
+      const confirmed = appointments.filter(a => a.status === 'CONFIRMED' || a.status === 'COMPLETED')
+      const todayRevenue = confirmed.reduce((sum, a) => sum + a.price, 0)
+
+      // Buscar total de clientes
+      const clientsSnapshot = await getDocs(collection(db, 'clients'))
+      const totalClients = clientsSnapshot.size
+
+      setStats({
+        todayAppointments: appointments.length,
+        weekRevenue: todayRevenue, // Simplificado - deveria calcular semana
+        totalClients,
+        occupancyRate: appointments.length > 0 ? Math.round((confirmed.length / appointments.length) * 100) : 0
+      })
+
     } catch (error) {
       console.error('Erro ao carregar dados:', error)
     } finally {
@@ -104,7 +123,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-dark flex items-center justify-center">
-        <div className="text-gold text-xl">Carregando...</div>
+        <Loader2 className="w-8 h-8 text-gold animate-spin" />
       </div>
     )
   }
@@ -227,7 +246,7 @@ export default function DashboardPage() {
               <div className="w-12 h-12 bg-gold/10 rounded-xl flex items-center justify-center">
                 <Calendar className="w-6 h-6 text-gold" />
               </div>
-              <span className="text-green-400 text-sm">+12%</span>
+              <span className="text-green-400 text-sm">Hoje</span>
             </div>
             <div className="text-3xl font-bold text-white mb-1">
               {stats.todayAppointments}
@@ -240,12 +259,12 @@ export default function DashboardPage() {
               <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center">
                 <DollarSign className="w-6 h-6 text-green-500" />
               </div>
-              <span className="text-green-400 text-sm">+8%</span>
+              <span className="text-green-400 text-sm">Hoje</span>
             </div>
             <div className="text-3xl font-bold text-white mb-1">
               R$ {stats.weekRevenue.toLocaleString()}
             </div>
-            <div className="text-gray-400 text-sm">Receita da Semana</div>
+            <div className="text-gray-400 text-sm">Receita do Dia</div>
           </div>
 
           <div className="card">
@@ -253,7 +272,7 @@ export default function DashboardPage() {
               <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center">
                 <Users className="w-6 h-6 text-blue-500" />
               </div>
-              <span className="text-green-400 text-sm">+5%</span>
+              <span className="text-gray-400 text-sm">Total</span>
             </div>
             <div className="text-3xl font-bold text-white mb-1">
               {stats.totalClients}
@@ -266,12 +285,12 @@ export default function DashboardPage() {
               <div className="w-12 h-12 bg-purple-500/10 rounded-xl flex items-center justify-center">
                 <TrendingUp className="w-6 h-6 text-purple-500" />
               </div>
-              <span className="text-gray-400 text-sm">Estável</span>
+              <span className="text-gray-400 text-sm">Hoje</span>
             </div>
             <div className="text-3xl font-bold text-white mb-1">
               {stats.occupancyRate}%
             </div>
-            <div className="text-gray-400 text-sm">Taxa de Ocupação</div>
+            <div className="text-gray-400 text-sm">Taxa de Confirmação</div>
           </div>
         </div>
 
@@ -290,54 +309,64 @@ export default function DashboardPage() {
             </Link>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-dark-100">
-                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Cliente</th>
-                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Serviço</th>
-                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Profissional</th>
-                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Horário</th>
-                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Valor</th>
-                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {todayAppointments.map((appointment) => (
-                  <tr key={appointment.id} className="border-b border-dark-100/50">
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gold/10 rounded-full flex items-center justify-center">
-                          <span className="text-gold font-bold">
-                            {appointment.clientName.charAt(0)}
+          {todayAppointments.length === 0 ? (
+            <div className="text-center py-12 text-gray-400">
+              <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>Nenhum agendamento para hoje</p>
+              <Link href="/dashboard/appointments/new" className="text-gold hover:underline mt-2 inline-block">
+                Criar primeiro agendamento
+              </Link>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-dark-100">
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Cliente</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Serviço</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Profissional</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Horário</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Valor</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {todayAppointments.map((appointment) => (
+                    <tr key={appointment.id} className="border-b border-dark-100/50">
+                      <td className="py-4 px-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gold/10 rounded-full flex items-center justify-center">
+                            <span className="text-gold font-bold">
+                              {appointment.clientName.charAt(0)}
+                            </span>
+                          </div>
+                          <span className="text-white font-medium">
+                            {appointment.clientName}
                           </span>
                         </div>
-                        <span className="text-white font-medium">
-                          {appointment.clientName}
+                      </td>
+                      <td className="py-4 px-4 text-gray-300">{appointment.serviceName}</td>
+                      <td className="py-4 px-4 text-gray-300">{appointment.professionalName}</td>
+                      <td className="py-4 px-4 text-gray-300">
+                        {appointment.dateTime.toLocaleTimeString('pt-BR', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </td>
+                      <td className="py-4 px-4 text-white font-medium">
+                        R$ {appointment.price.toFixed(2)}
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)} text-white`}>
+                          {getStatusText(appointment.status)}
                         </span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4 text-gray-300">{appointment.serviceName}</td>
-                    <td className="py-4 px-4 text-gray-300">{appointment.professionalName}</td>
-                    <td className="py-4 px-4 text-gray-300">
-                      {appointment.dateTime.toLocaleTimeString('pt-BR', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </td>
-                    <td className="py-4 px-4 text-white font-medium">
-                      R$ {appointment.price.toFixed(2)}
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)} text-white`}>
-                        {getStatusText(appointment.status)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </main>
     </div>
