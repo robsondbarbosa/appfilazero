@@ -1,0 +1,19 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": [
+    {
+      "source": "apps/api",
+      "codebase": "api"
+    }
+  ],
+  "hosting": {
+    "source": "apps/web",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+  },
+  "storage": {
+    "rules": "storage.rules"
+  }
+}
