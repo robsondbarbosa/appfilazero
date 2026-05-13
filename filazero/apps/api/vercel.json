@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "name": "appfilazero-api",
+  "builds": [
+    {
+      "src": "src/index.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/src/index.ts"
+    }
+  ],
+  "installCommand": "npm install --legacy-peer-deps",
+  "env": {
+    "FIREBASE_SERVICE_ACCOUNT_KEY": "@firebase_service_account",
+    "MP_ACCESS_TOKEN": "@mp_access_token"
+  }
+}
