@@ -1,0 +1,17 @@
+# Deploy na Vercel
+
+## Passo 1: Acesse
+https://vercel.com/new
+
+## Passo 2: Importe o repositório
+URL: https://github.com/robsondbarbosa/filazero
+
+## Passo 3: Configuração
+- Framework: Next.js
+- Root Directory: apps/web
+- Build Command: npm run build
+
+## Passo 4: Deploy
+Clique em "Deploy"
+
+Pronto! 🚀

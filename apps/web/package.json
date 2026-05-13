@@ -1,0 +1,52 @@
+{
+  "name": "@filazero/web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf .next dist",
+    "export": "next build",
+    "cap:init": "cap init",
+    "cap:add:android": "cap add android",
+    "cap:add:ios": "cap add ios",
+    "cap:sync": "cap sync",
+    "cap:open:android": "cap open android",
+    "cap:open:ios": "cap open ios",
+    "cap:build:android": "npm run export && cap sync android && cd android && ./gradlew assembleRelease",
+    "cap:build:ios": "npm run export && cap sync ios && cd ios/App && xcodebuild -workspace App.xcworkspace -scheme App -configuration Release",
+    "mobile:build": "npm run export && cap sync"
+  },
+  "dependencies": {
+    "next": "14.0.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@filazero/types": "workspace:*",
+    "@filazero/firebase": "workspace:*",
+    "firebase": "^10.7.0",
+    "lucide-react": "^0.294.0",
+    "clsx": "^2.0.0",
+    "tailwind-merge": "^2.0.0",
+    "@capacitor/core": "^5.6.0",
+    "@capacitor/android": "^5.6.0",
+    "@capacitor/ios": "^5.6.0",
+    "@capacitor/push-notifications": "^5.1.1",
+    "@capacitor/local-notifications": "^5.0.7",
+    "@capacitor/splash-screen": "^5.0.7",
+    "@capacitor/status-bar": "^5.0.7",
+    "@capacitor/app": "^5.0.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.3.6",
+    "typescript": "^5.3.0",
+    "@capacitor/cli": "^5.6.0"
+  }
+}
