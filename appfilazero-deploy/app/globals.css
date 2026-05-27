@@ -1,0 +1,312 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --gold: #D4AF37;
+  --gold-light: #F2C75B;
+  --gold-dark: #B8960C;
+  --dark: #1A1A1A;
+  --dark-lighter: #333333;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  font-family: 'Poppins', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--dark);
+  color: white;
+  /* Previne bounce no iOS */
+  overscroll-behavior-y: none;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Safe area para notch e home indicator */
+.safe-area-inset {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Custom scrollbar - escondida no mobile */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+@media (min-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+}
+
+::-webkit-scrollbar-track {
+  background: #1A1A1A;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D4AF37;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #F2C75B;
+}
+
+/* Touch action otimizado */
+.touch-manipulation {
+  touch-action: manipulation;
+}
+
+/* Previne seleção de texto em elementos interativos */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.1), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.3s ease-out;
+}
+
+.animate-pulse-slow {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Gradient text */
+.text-gradient-gold {
+  background: linear-gradient(135deg, #D4AF37 0%, #F2C75B 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Button styles - otimizados para touch */
+.btn-primary {
+  @apply bg-gradient-gold text-dark font-semibold px-6 py-4 rounded-xl
+         transition-all duration-200 hover:shadow-lg hover:shadow-gold/30
+         active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed
+         min-h-[52px] touch-manipulation no-select;
+}
+
+.btn-secondary {
+  @apply border-2 border-gold text-gold font-semibold px-6 py-4 rounded-xl
+         transition-all duration-200 hover:bg-gold hover:text-dark
+         active:scale-95 min-h-[52px] touch-manipulation no-select;
+}
+
+/* Botão flutuante para mobile */
+.btn-fab {
+  @apply fixed bottom-6 right-6 w-14 h-14 bg-gradient-gold rounded-full
+         flex items-center justify-center shadow-lg shadow-gold/30
+         active:scale-90 transition-transform z-40;
+  bottom: calc(1.5rem + env(safe-area-inset-bottom));
+}
+
+/* Card styles */
+.card {
+  @apply bg-dark-300 rounded-2xl border border-dark-100 p-5
+         transition-all duration-300 hover:border-gold/30;
+}
+
+/* Input styles - otimizados para mobile */
+.input {
+  @apply w-full bg-dark-200 border border-dark-100 rounded-xl px-4 py-4
+         text-white text-base placeholder-gray-500 focus:outline-none focus:border-gold
+         transition-colors duration-300 min-h-[52px];
+  /* Prevents zoom no iOS */
+  font-size: 16px;
+}
+
+/* Bottom sheet para mobile */
+.bottom-sheet {
+  @apply fixed inset-x-0 bottom-0 bg-dark-300 rounded-t-3xl p-6 z-50;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+}
+
+.bottom-sheet-overlay {
+  @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-40;
+}
+
+/* Pull to refresh indicator */
+.pull-to-refresh {
+  @apply fixed top-0 left-0 right-0 h-16 flex items-center justify-center
+         text-gold z-30 transition-transform duration-300;
+  transform: translateY(-100%);
+}
+
+.pull-to-refresh.visible {
+  transform: translateY(0);
+}
+
+/* Skeleton loading */
+.skeleton {
+  @apply bg-dark-100 rounded animate-pulse-slow;
+}
+
+/* Toast notifications */
+.toast {
+  @apply fixed bottom-24 left-4 right-4 bg-dark-300 border border-gold/30
+         rounded-xl p-4 shadow-lg z-50 animate-slide-up;
+  bottom: calc(6rem + env(safe-area-inset-bottom));
+}
+
+/* Status bar para iOS PWA */
+.status-bar {
+  @apply fixed top-0 left-0 right-0 h-12 bg-dark z-50;
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Tab bar para mobile */
+.tab-bar {
+  @apply fixed bottom-0 left-0 right-0 bg-dark-300 border-t border-dark-100
+         flex items-center justify-around py-2 z-40;
+  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+}
+
+/* Hide scrollbar but keep functionality */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Horizontal scroll snap */
+.snap-scroll {
+  @apply flex overflow-x-auto snap-x snap-mandatory hide-scrollbar;
+}
+
+.snap-scroll > * {
+  @apply snap-center shrink-0;
+}
+
+/* Ripple effect para botões */
+.ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.2) 10%, transparent 10.01%);
+  background-repeat: no-repeat;
+  background-position: 50%;
+  transform: scale(10, 10);
+  opacity: 0;
+  transition: transform 0.5s, opacity 1s;
+}
+
+.ripple:active::after {
+  transform: scale(0, 0);
+  opacity: 0.3;
+  transition: 0s;
+}
+
+/* Swipe actions */
+.swipe-item {
+  @apply relative overflow-hidden;
+}
+
+.swipe-actions {
+  @apply absolute inset-y-0 right-0 flex items-center;
+}
+
+/* Loading spinner */
+.spinner {
+  @apply w-6 h-6 border-2 border-gold/30 border-t-gold rounded-full;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Focus visible apenas para keyboard navigation */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+:focus-visible {
+  @apply outline-2 outline-gold outline-offset-2;
+}
+
+/* Reduz motion para acessibilidade */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
