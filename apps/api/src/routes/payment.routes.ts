@@ -1,12 +1,16 @@
-import { Router } from 'express'
+import { Router, type Request, type Response } from 'express'
 import { MercadoPagoConfig, Preference } from 'mercadopago'
 import { adminDb } from '@filazero/firebase'
 import { notificationService } from '../services/notification.service'
 
 const router = Router({ mergeParams: true })
 
+type TenantParams = {
+  tenantId: string
+}
+
 // Create payment preference
-router.post('/create', async (req, res) => {
+router.post('/create', async (req: Request<TenantParams>, res: Response) => {
   try {
     const { tenantId } = req.params
     const { appointmentId } = req.body
@@ -65,11 +69,20 @@ router.post('/create', async (req, res) => {
       updatedAt: new Date()
     })
     
+    const interactionData = (result as {
+      point_of_interaction?: {
+        transaction_data?: {
+          qr_code?: string
+          qr_code_base64?: string
+        }
+      }
+    }).point_of_interaction?.transaction_data
+
     res.json({
       preferenceId: result.id,
       initPoint: result.init_point,
-      qrCode: result.point_of_interaction?.transaction_data?.qr_code,
-      qrCodeBase64: result.point_of_interaction?.transaction_data?.qr_code_base64,
+      qrCode: interactionData?.qr_code,
+      qrCodeBase64: interactionData?.qr_code_base64,
     })
   } catch (error) {
     console.error('Error creating payment:', error)
@@ -78,7 +91,7 @@ router.post('/create', async (req, res) => {
 })
 
 // Mercado Pago webhook
-router.post('/mercadopago', async (req, res) => {
+router.post('/mercadopago', async (req: Request, res: Response) => {
   try {
     const { type, data } = req.body
     
@@ -90,6 +103,10 @@ router.post('/mercadopago', async (req, res) => {
       
       if (external_reference && status === 'approved') {
         const [tenantId, appointmentId] = external_reference.split(':')
+
+        if (!tenantId || !appointmentId) {
+          return res.status(400).json({ error: 'Invalid external reference' })
+        }
         
         // Update in transaction
         await adminDb.runTransaction(async (transaction) => {

@@ -16,8 +16,7 @@ import {
   Bell,
   Loader2
 } from 'lucide-react'
-import { auth, db } from '@filazero/firebase/client'
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore'
+import { getFirebaseClient } from '@/lib/firebase'
 
 interface DashboardStats {
   todayAppointments: number
@@ -49,20 +48,29 @@ export default function DashboardPage() {
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([])
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      setUser(user)
-      loadDashboardData()
-    })
+    let unsubscribe: (() => void) | undefined
 
-    return () => unsubscribe()
+    void (async () => {
+      const { auth, db } = await getFirebaseClient()
+
+      unsubscribe = auth.onAuthStateChanged((currentUser) => {
+        if (!currentUser) {
+          router.push('/login')
+          return
+        }
+        setUser(currentUser)
+        void loadDashboardData(db)
+      })
+    })()
+
+    return () => {
+      unsubscribe?.()
+    }
   }, [router])
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (db: Awaited<ReturnType<typeof getFirebaseClient>>['db']) => {
     try {
+      const { collection, query, where, getDocs, Timestamp } = await import('firebase/firestore')
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const tomorrow = new Date(today)
@@ -116,6 +124,7 @@ export default function DashboardPage() {
   }
 
   const handleLogout = async () => {
+    const { auth } = await getFirebaseClient()
     await auth.signOut()
     router.push('/login')
   }

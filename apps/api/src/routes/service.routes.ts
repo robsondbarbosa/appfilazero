@@ -1,10 +1,14 @@
-import { Router } from 'express'
+import { Router, type Request, type Response } from 'express'
 import { adminDb } from '@filazero/firebase'
 
 const router = Router({ mergeParams: true })
 
+type TenantParams = {
+  tenantId: string
+}
+
 // Get all services for tenant
-router.get('/', async (req, res) => {
+router.get('/', async (req: Request<TenantParams>, res: Response) => {
   try {
     const { tenantId } = req.params
     
@@ -28,7 +32,7 @@ router.get('/', async (req, res) => {
 })
 
 // Create service
-router.post('/', async (req, res) => {
+router.post('/', async (req: Request<TenantParams>, res: Response) => {
   try {
     const { tenantId } = req.params
     const { name, description, duration, price } = req.body

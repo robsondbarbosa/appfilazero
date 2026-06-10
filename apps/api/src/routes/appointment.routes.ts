@@ -1,16 +1,29 @@
-import { Router } from 'express'
+import { Router, type Request, type Response } from 'express'
 import { adminDb } from '@filazero/firebase'
 import { AppointmentStatus } from '@filazero/types'
+import type { Query } from 'firebase-admin/firestore'
+
+type TenantParams = {
+  tenantId: string
+}
+
+type AppointmentRecord = {
+  id: string
+  dateTime: {
+    toDate: () => Date
+  }
+  [key: string]: unknown
+}
 
 const router = Router({ mergeParams: true })
 
 // Get appointments for tenant
-router.get('/', async (req, res) => {
+router.get('/', async (req: Request<TenantParams>, res: Response) => {
   try {
     const { tenantId } = req.params
     const { professionalId, date } = req.query
     
-    let query = adminDb
+    let query: Query = adminDb
       .collection('appointments')
       .where('tenantId', '==', tenantId)
       .orderBy('dateTime', 'asc')
@@ -21,10 +34,10 @@ router.get('/', async (req, res) => {
     
     const snapshot = await query.get()
     
-    let appointments = snapshot.docs.map(doc => ({
+    let appointments: AppointmentRecord[] = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
-    }))
+    })) as AppointmentRecord[]
     
     // Filter by date if provided (client-side filtering for date range)
     if (date) {
@@ -32,7 +45,7 @@ router.get('/', async (req, res) => {
       const nextDay = new Date(filterDate)
       nextDay.setDate(nextDay.getDate() + 1)
       
-      appointments = appointments.filter(apt => {
+      appointments = appointments.filter((apt) => {
         const aptDate = apt.dateTime.toDate()
         return aptDate >= filterDate && aptDate < nextDay
       })
@@ -46,7 +59,7 @@ router.get('/', async (req, res) => {
 })
 
 // Create appointment with double-booking prevention
-router.post('/', async (req, res) => {
+router.post('/', async (req: Request<TenantParams>, res: Response) => {
   try {
     const { tenantId } = req.params
     const { 
@@ -129,7 +142,7 @@ router.post('/', async (req, res) => {
 })
 
 // Cancel appointment
-router.put('/:id/cancel', async (req, res) => {
+router.put('/:id/cancel', async (req: Request<{ id: string }>, res: Response) => {
   try {
     const { id } = req.params
     

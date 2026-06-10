@@ -35,7 +35,7 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
@@ -49,7 +49,7 @@ app.use('/webhooks', paymentRoutes)
 app.use('/cron', cronRoutes)
 
 // Error handling
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err.stack)
   res.status(500).json({ 
     error: 'Internal Server Error',

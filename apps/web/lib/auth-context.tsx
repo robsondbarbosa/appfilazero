@@ -1,15 +1,15 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { 
-  onAuthStateChanged, 
-  signInWithPopup, 
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import {
+  onAuthStateChanged,
+  signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
-  User as FirebaseUser
+  type User as FirebaseUser,
 } from 'firebase/auth'
-import { auth, googleProvider } from '@filazero/firebase'
+import { getFirebaseClient } from '@/lib/firebase'
 import { User, UserRole } from '@filazero/types'
 
 interface AuthContextType {
@@ -30,60 +30,71 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      setFirebaseUser(fbUser)
-      
-      if (fbUser) {
-        // Buscar dados adicionais do usuário no Firestore
-        // Por enquanto, criar um usuário básico
-        setUser({
-          id: fbUser.uid,
-          email: fbUser.email || '',
-          name: fbUser.displayName || '',
-          role: UserRole.CLIENT,
-          isActive: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-      } else {
-        setUser(null)
-      }
-      
-      setLoading(false)
-    })
+    let unsubscribe: (() => void) | undefined
 
-    return () => unsubscribe()
+    void (async () => {
+      const { auth } = await getFirebaseClient()
+
+      unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+        setFirebaseUser(fbUser)
+
+        if (fbUser) {
+          setUser({
+            id: fbUser.uid,
+            email: fbUser.email || '',
+            name: fbUser.displayName || '',
+            role: UserRole.CLIENT,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+        } else {
+          setUser(null)
+        }
+
+        setLoading(false)
+      })
+    })()
+
+    return () => {
+      unsubscribe?.()
+    }
   }, [])
 
   const loginWithGoogle = async () => {
+    const { auth, googleProvider } = await getFirebaseClient()
     await signInWithPopup(auth, googleProvider)
   }
 
   const loginWithEmail = async (email: string, password: string) => {
+    const { auth } = await getFirebaseClient()
     await signInWithEmailAndPassword(auth, email, password)
   }
 
   const register = async (email: string, password: string, name: string) => {
+    const { auth } = await getFirebaseClient()
     const result = await createUserWithEmailAndPassword(auth, email, password)
-    
-    // Aqui você pode salvar dados adicionais no Firestore
+
     console.log('Usuário registrado:', result.user.uid, name)
   }
 
   const signOut = async () => {
+    const { auth } = await getFirebaseClient()
     await firebaseSignOut(auth)
   }
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      firebaseUser,
-      loading, 
-      loginWithGoogle, 
-      loginWithEmail, 
-      register, 
-      signOut 
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        firebaseUser,
+        loading,
+        loginWithGoogle,
+        loginWithEmail,
+        register,
+        signOut,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

@@ -1,26 +1,32 @@
 // Admin-side Firebase (API)
-import { initializeApp, cert, App } from 'firebase-admin/app';
+import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { getAuth, Auth } from 'firebase-admin/auth';
 import { getStorage, Storage } from 'firebase-admin/storage';
 
-let app: App;
-let db: Firestore;
-let auth: Auth;
-let storage: Storage;
+function createAdminApp(): App {
+  if (getApps().length > 0) {
+    return getApps()[0]!;
+  }
 
-if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
 
-  app = initializeApp({
-    credential: cert(serviceAccount),
+    return initializeApp({
+      credential: cert(serviceAccount),
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+    });
+  }
+
+  return initializeApp({
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
   });
-
-  db = getFirestore(app);
-  auth = getAuth(app);
-  storage = getStorage(app);
 }
+
+const app = createAdminApp();
+const db = getFirestore(app);
+const auth = getAuth(app);
+const storage = getStorage(app);
 
 // Helper functions for Firestore queries
 export function getTenantRef(tenantId: string) {

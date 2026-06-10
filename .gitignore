@@ -7,6 +7,9 @@ atendimento-tecnico/
 
 # Dependências
 node_modules/
+.next/
+dist/
+*.tsbuildinfo
 
 # Logs
 *.log

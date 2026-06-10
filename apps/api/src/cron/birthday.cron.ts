@@ -1,6 +1,24 @@
 import { adminDb } from '@filazero/firebase';
 import { notificationService } from '../services/notification.service';
 
+type BirthDateValue = string | Date | { toDate?: () => Date };
+
+function normalizeBirthDate(value: BirthDateValue): Date {
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    return new Date(value);
+  }
+
+  if (typeof value === 'object' && value !== null && typeof value.toDate === 'function') {
+    return value.toDate();
+  }
+
+  return new Date();
+}
+
 /**
  * Verifica aniversários do dia e envia mensagens de parabéns
  * Deve ser executada diariamente às 9h da manhã
@@ -33,7 +51,12 @@ export async function checkBirthdaysAndNotify(): Promise<void> {
         .get();
       
       // Agrupar clientes únicos por email
-      const uniqueClients = new Map();
+      const uniqueClients = new Map<string, {
+        name: string;
+        phone: string;
+        email: string;
+        birthDate?: { toDate?: () => Date } | string | Date;
+      }>();
       
       appointmentsSnapshot.docs.forEach(doc => {
         const appointment = doc.data();
@@ -52,7 +75,7 @@ export async function checkBirthdaysAndNotify(): Promise<void> {
       // Verificar aniversários (se tivermos a data de nascimento)
       for (const [email, client] of uniqueClients) {
         if (client.birthDate) {
-          const birthDate = client.birthDate.toDate ? client.birthDate.toDate() : new Date(client.birthDate);
+          const birthDate = normalizeBirthDate(client.birthDate);
           const birthMonth = birthDate.getMonth() + 1;
           const birthDay = birthDate.getDate();
           

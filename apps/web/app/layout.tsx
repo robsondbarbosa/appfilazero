@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Montserrat, Poppins } from 'next/font/google'
 import './globals.css'
 import { PWAProvider } from '@/components/pwa-provider'
+import { AuthProvider } from '@/lib/auth-context'
 
 const montserrat = Montserrat({
   subsets: ['latin'],
@@ -68,9 +69,11 @@ export default function RootLayout({
         <link rel="mask-icon" href="/icons/safari-pinned-tab.svg" color="#D4AF37" />
       </head>
       <body className="font-poppins bg-dark text-white min-h-screen safe-area-inset">
-        <PWAProvider>
-          {children}
-        </PWAProvider>
+        <AuthProvider>
+          <PWAProvider>
+            {children}
+          </PWAProvider>
+        </AuthProvider>
       </body>
     </html>
   )

@@ -23,7 +23,7 @@ export default function LoginPage() {
     try {
       await loginWithEmail(email, password)
       router.push('/dashboard')
-    } catch (err: any) {
+    } catch {
       setError('Email ou senha incorretos')
     } finally {
       setLoading(false)
@@ -34,7 +34,7 @@ export default function LoginPage() {
     try {
       await loginWithGoogle()
       router.push('/dashboard')
-    } catch (err: any) {
+    } catch {
       setError('Erro ao fazer login com Google')
     }
   }

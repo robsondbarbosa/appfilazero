@@ -21,11 +21,11 @@
     "mobile:build": "npm run export && cap sync"
   },
   "dependencies": {
-    "next": "14.0.4",
+    "next": "^14.2.33",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "@filazero/types": "workspace:*",
-    "@filazero/firebase": "workspace:*",
+    "@filazero/types": "file:../../packages/types",
+    "@filazero/firebase": "file:../../packages/firebase",
     "firebase": "^10.7.0",
     "lucide-react": "^0.294.0",
     "clsx": "^2.0.0",
