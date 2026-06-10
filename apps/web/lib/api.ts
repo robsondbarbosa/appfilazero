@@ -1,6 +1,8 @@
 'use client'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api'
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '')
 const TENANT_ID_STORAGE_KEY = 'filazero-tenant-id'
 
 export class ApiError extends Error {
