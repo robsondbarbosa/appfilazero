@@ -12,6 +12,7 @@ import { professionalRoutes } from './routes/professional.routes'
 import { appointmentRoutes } from './routes/appointment.routes'
 import { paymentRoutes } from './routes/payment.routes'
 import { cronRoutes } from './routes/cron.routes'
+import { clientsRoutes } from './routes/clients.routes'
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -41,6 +42,7 @@ app.get('/health', (_req, res) => {
 
 // Routes
 app.use('/tenants', tenantRoutes)
+app.use('/:tenantId/clients', clientsRoutes)
 app.use('/:tenantId/services', serviceRoutes)
 app.use('/:tenantId/professionals', professionalRoutes)
 app.use('/:tenantId/appointments', appointmentRoutes)

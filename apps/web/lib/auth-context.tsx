@@ -2,13 +2,15 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import {
-  onAuthStateChanged,
-  signInWithPopup,
-  signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signInWithPopup,
   signOut as firebaseSignOut,
+  updateProfile,
   type User as FirebaseUser,
 } from 'firebase/auth'
+import { clearStoredTenantId, getStoredTenantId, setStoredTenantId } from '@/lib/api'
 import { getFirebaseClient } from '@/lib/firebase'
 import { User, UserRole } from '@filazero/types'
 
@@ -18,7 +20,7 @@ interface AuthContextType {
   loading: boolean
   loginWithGoogle: () => Promise<void>
   loginWithEmail: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string, name: string) => Promise<void>
+  register: (email: string, password: string, name: string, phone?: string, tenantId?: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -33,22 +35,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let unsubscribe: (() => void) | undefined
 
     void (async () => {
-      const { auth } = await getFirebaseClient()
+      const { auth, db } = await getFirebaseClient()
+      const { doc, getDoc } = await import('firebase/firestore')
 
       unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
         setFirebaseUser(fbUser)
 
         if (fbUser) {
+          const profileSnapshot = await getDoc(doc(db, 'users', fbUser.uid))
+          const profile = profileSnapshot.exists() ? profileSnapshot.data() : null
+          const tenantId =
+            typeof profile?.tenantId === 'string' && profile.tenantId
+              ? profile.tenantId
+              : getStoredTenantId()
+
+          if (tenantId) {
+            setStoredTenantId(tenantId)
+          }
+
           setUser({
             id: fbUser.uid,
-            email: fbUser.email || '',
-            name: fbUser.displayName || '',
-            role: UserRole.CLIENT,
-            isActive: true,
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            email: profile?.email || fbUser.email || '',
+            tenantId: tenantId || undefined,
+            name: profile?.name || fbUser.displayName || '',
+            phone: profile?.phone || '',
+            role: (profile?.role as UserRole) || UserRole.CLIENT,
+            isActive: profile?.isActive ?? true,
+            createdAt:
+              profile?.createdAt && typeof profile.createdAt.toDate === 'function'
+                ? profile.createdAt.toDate()
+                : new Date(),
+            updatedAt:
+              profile?.updatedAt && typeof profile.updatedAt.toDate === 'function'
+                ? profile.updatedAt.toDate()
+                : new Date(),
           })
         } else {
+          clearStoredTenantId()
           setUser(null)
         }
 
@@ -71,16 +94,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithEmailAndPassword(auth, email, password)
   }
 
-  const register = async (email: string, password: string, name: string) => {
-    const { auth } = await getFirebaseClient()
+  const register = async (
+    email: string,
+    password: string,
+    name: string,
+    phone?: string,
+    tenantId?: string
+  ) => {
+    const { auth, db } = await getFirebaseClient()
+    const { doc, serverTimestamp, setDoc } = await import('firebase/firestore')
     const result = await createUserWithEmailAndPassword(auth, email, password)
 
-    console.log('Usuário registrado:', result.user.uid, name)
+    await updateProfile(result.user, { displayName: name })
+
+    await setDoc(
+      doc(db, 'users', result.user.uid),
+      {
+        email,
+        name,
+        phone: phone || '',
+        tenantId: tenantId || '',
+        role: UserRole.TENANT_ADMIN,
+        isActive: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    )
+
+    if (tenantId) {
+      setStoredTenantId(tenantId)
+    }
   }
 
   const signOut = async () => {
     const { auth } = await getFirebaseClient()
     await firebaseSignOut(auth)
+    clearStoredTenantId()
   }
 
   return (

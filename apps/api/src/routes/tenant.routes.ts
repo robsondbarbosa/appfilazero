@@ -3,7 +3,31 @@ import { adminDb } from '@filazero/firebase'
 
 const router = Router()
 
-// Get tenant by slug (public)
+router.get('/id/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+    const doc = await adminDb.collection('tenants').doc(id).get()
+
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Tenant not found' })
+    }
+
+    const tenant = doc.data()
+
+    if (!tenant) {
+      return res.status(404).json({ error: 'Tenant not found' })
+    }
+
+    delete tenant.mpAccessToken
+    delete tenant.mpPublicKey
+
+    res.json({ id: doc.id, ...tenant })
+  } catch (error) {
+    console.error('Error fetching tenant by id:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
 router.get('/:slug', async (req, res) => {
   try {
     const { slug } = req.params
@@ -31,7 +55,6 @@ router.get('/:slug', async (req, res) => {
   }
 })
 
-// Create tenant (super admin only)
 router.post('/', async (req, res) => {
   try {
     const { name, slug, email, plan = 'FREE' } = req.body
@@ -68,6 +91,70 @@ router.post('/', async (req, res) => {
     res.status(201).json({ id: docRef.id, ...tenantData })
   } catch (error) {
     console.error('Error creating tenant:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params
+    const tenantRef = adminDb.collection('tenants').doc(id)
+    const tenantDoc = await tenantRef.get()
+
+    if (!tenantDoc.exists) {
+      return res.status(404).json({ error: 'Tenant not found' })
+    }
+
+    const {
+      name,
+      email,
+      phone,
+      whatsapp,
+      address,
+      city,
+      state,
+      zipCode,
+      description,
+      primaryColor,
+      secondaryColor,
+      bookingWindow,
+      cancelDeadline,
+      requirePayment,
+      autoConfirm,
+    } = req.body
+
+    const updates = {
+      ...(typeof name === 'string' ? { name } : {}),
+      ...(typeof email === 'string' ? { email } : {}),
+      ...(typeof phone === 'string' ? { phone } : {}),
+      ...(typeof whatsapp === 'string' ? { whatsapp } : {}),
+      ...(typeof address === 'string' ? { address } : {}),
+      ...(typeof city === 'string' ? { city } : {}),
+      ...(typeof state === 'string' ? { state } : {}),
+      ...(typeof zipCode === 'string' ? { zipCode } : {}),
+      ...(typeof description === 'string' ? { description } : {}),
+      ...(typeof primaryColor === 'string' ? { primaryColor } : {}),
+      ...(typeof secondaryColor === 'string' ? { secondaryColor } : {}),
+      ...(typeof bookingWindow === 'number' ? { bookingWindow } : {}),
+      ...(typeof cancelDeadline === 'number' ? { cancelDeadline } : {}),
+      ...(typeof requirePayment === 'boolean' ? { requirePayment } : {}),
+      ...(typeof autoConfirm === 'boolean' ? { autoConfirm } : {}),
+      updatedAt: new Date(),
+    }
+
+    await tenantRef.update(updates)
+
+    const nextTenant: Record<string, unknown> = {
+      ...tenantDoc.data(),
+      ...updates,
+    }
+
+    delete nextTenant.mpAccessToken
+    delete nextTenant.mpPublicKey
+
+    res.json({ id, ...nextTenant })
+  } catch (error) {
+    console.error('Error updating tenant:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 })
