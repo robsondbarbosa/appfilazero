@@ -1,8 +1,12 @@
 'use client'
 
+import { getFirebaseClient } from '@/lib/firebase'
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
-  (process.env.NODE_ENV === 'development' ? 'http://localhost:3001' : '')
+  (process.env.NODE_ENV === 'development'
+    ? 'http://localhost:3001'
+    : 'https://appfilazero-api.vercel.app')
 const TENANT_ID_STORAGE_KEY = 'filazero-tenant-id'
 
 export class ApiError extends Error {
@@ -44,12 +48,21 @@ export function resolveTenantId(userTenantId?: string | null): string | null {
 }
 
 export async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const { auth } = await getFirebaseClient()
+  const token = auth.currentUser ? await auth.currentUser.getIdToken() : null
+  const headers = new Headers(init?.headers)
+
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers || {}),
-    },
+    headers,
   })
 
   const responseText = await response.text()

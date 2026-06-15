@@ -1,7 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   Calendar,
@@ -16,6 +15,8 @@ import {
   Bell,
   Loader2
 } from 'lucide-react'
+import { useAuth } from '@/lib/auth-context'
+import { requestJson, resolveTenantId } from '@/lib/api'
 import { getFirebaseClient } from '@/lib/firebase'
 
 interface DashboardStats {
@@ -36,8 +37,7 @@ interface Appointment {
 }
 
 export default function DashboardPage() {
-  const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const { user, loading: authLoading, signOut } = useAuth()
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<DashboardStats>({
     todayAppointments: 0,
@@ -46,31 +46,32 @@ export default function DashboardPage() {
     occupancyRate: 0
   })
   const [todayAppointments, setTodayAppointments] = useState<Appointment[]>([])
+  const tenantId = useMemo(() => resolveTenantId(user?.tenantId), [user?.tenantId])
 
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined
-
-    void (async () => {
-      const { auth, db } = await getFirebaseClient()
-
-      unsubscribe = auth.onAuthStateChanged((currentUser) => {
-        if (!currentUser) {
-          router.push('/login')
-          return
-        }
-        setUser(currentUser)
-        void loadDashboardData(db)
-      })
-    })()
-
-    return () => {
-      unsubscribe?.()
+    if (authLoading) {
+      return
     }
-  }, [router])
 
-  const loadDashboardData = async (db: Awaited<ReturnType<typeof getFirebaseClient>>['db']) => {
+    if (!tenantId) {
+      setTodayAppointments([])
+      setStats({
+        todayAppointments: 0,
+        weekRevenue: 0,
+        totalClients: 0,
+        occupancyRate: 0
+      })
+      setLoading(false)
+      return
+    }
+
+    void loadDashboardData(tenantId)
+  }, [authLoading, tenantId])
+
+  const loadDashboardData = async (tenantId: string) => {
     try {
       const { collection, query, where, getDocs, Timestamp } = await import('firebase/firestore')
+      const { db } = await getFirebaseClient()
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       const tomorrow = new Date(today)
@@ -79,11 +80,15 @@ export default function DashboardPage() {
       // Buscar agendamentos de hoje
       const appointmentsQuery = query(
         collection(db, 'appointments'),
+        where('tenantId', '==', tenantId),
         where('dateTime', '>=', Timestamp.fromDate(today)),
         where('dateTime', '<', Timestamp.fromDate(tomorrow))
       )
 
-      const appointmentsSnapshot = await getDocs(appointmentsQuery)
+      const [appointmentsSnapshot, clients] = await Promise.all([
+        getDocs(appointmentsQuery),
+        requestJson<Array<{ id: string }>>(`/${tenantId}/clients`)
+      ])
       const appointments: Appointment[] = []
       
       appointmentsSnapshot.forEach((doc) => {
@@ -105,14 +110,10 @@ export default function DashboardPage() {
       const confirmed = appointments.filter(a => a.status === 'CONFIRMED' || a.status === 'COMPLETED')
       const todayRevenue = confirmed.reduce((sum, a) => sum + a.price, 0)
 
-      // Buscar total de clientes
-      const clientsSnapshot = await getDocs(collection(db, 'clients'))
-      const totalClients = clientsSnapshot.size
-
       setStats({
         todayAppointments: appointments.length,
         weekRevenue: todayRevenue, // Simplificado - deveria calcular semana
-        totalClients,
+        totalClients: clients.length,
         occupancyRate: appointments.length > 0 ? Math.round((confirmed.length / appointments.length) * 100) : 0
       })
 
@@ -124,12 +125,10 @@ export default function DashboardPage() {
   }
 
   const handleLogout = async () => {
-    const { auth } = await getFirebaseClient()
-    await auth.signOut()
-    router.push('/login')
+    await signOut()
   }
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-dark flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-gold animate-spin" />
@@ -230,7 +229,7 @@ export default function DashboardPage() {
               Dashboard
             </h1>
             <p className="text-gray-400">
-              Bem-vindo de volta, {user?.displayName || 'Administrador'}
+              Bem-vindo de volta, {user?.name || 'Administrador'}
             </p>
           </div>
           <div className="flex items-center gap-4">
