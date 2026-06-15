@@ -31,3 +31,4 @@ Thumbs.db
 # Ambiente
 .env
 .env.local
+.vercel

@@ -2,6 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "npm install",
-  "buildCommand": "npx turbo run build --filter=@filazero/web",
-  "devCommand": "npm run dev --workspace=@filazero/web"
+  "buildCommand": "npm run build --workspace=@filazero/types && npm run build --workspace=@filazero/firebase && npm run build --workspace=@filazero/web",
+  "devCommand": "npm run dev --workspace=@filazero/web",
+  "outputDirectory": "apps/web/dist"
 }
