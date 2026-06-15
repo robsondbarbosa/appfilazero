@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from 'express'
-import { db as adminDb } from '@filazero/firebase/admin'
+import { db as adminDb } from '@filazero/firebase/server'
 import { collection, getDocs, query, where } from 'firebase/firestore'
 
 type TenantParams = {

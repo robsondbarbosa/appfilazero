@@ -6,6 +6,7 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
+import { authMiddleware } from './middleware/auth.middleware'
 import { tenantRoutes } from './routes/tenant.routes'
 import { serviceRoutes } from './routes/service.routes'
 import { professionalRoutes } from './routes/professional.routes'
@@ -39,6 +40,8 @@ app.use(express.urlencoded({ extended: true }))
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
+
+app.use(authMiddleware)
 
 // Routes
 app.use('/tenants', tenantRoutes)

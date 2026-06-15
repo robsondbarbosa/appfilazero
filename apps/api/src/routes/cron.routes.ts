@@ -3,6 +3,21 @@ import { cancelExpiredAppointments, sendAppointmentReminders } from '../cron/app
 import { checkBirthdaysAndNotify } from '../cron/birthday.cron'
 
 const router = Router()
+const cronSecret = process.env.CRON_SECRET
+
+router.use((req, res, next) => {
+  if (!cronSecret) {
+    return res.status(503).json({ error: 'CRON_SECRET is not configured' })
+  }
+
+  const providedSecret = req.header('x-cron-secret')
+
+  if (!providedSecret || providedSecret !== cronSecret) {
+    return res.status(401).json({ error: 'Unauthorized cron request' })
+  }
+
+  next()
+})
 
 /**
  * Endpoint para executar cron jobs manualmente

@@ -56,4 +56,3 @@ export function getDocument<T extends DocumentData = DocumentData>(path: string,
 }
 
 export { app, db, auth, storage };
-

@@ -9,4 +9,4 @@ export {
   getProfessionalsQuery,
   getAppointmentsQuery,
   getPaymentsQuery
-} from './admin';
+} from './server';

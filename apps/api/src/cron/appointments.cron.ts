@@ -1,4 +1,4 @@
-import { db as adminDb } from '@filazero/firebase/admin';
+import { db as adminDb } from '@filazero/firebase/server';
 import { collection, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { notificationService } from '../services/notification.service';
 

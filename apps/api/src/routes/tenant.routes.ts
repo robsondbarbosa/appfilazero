@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { db as adminDb } from '@filazero/firebase/admin'
+import { db as adminDb } from '@filazero/firebase/server'
 import { addDoc, collection, doc, getDoc, getDocs, limit, query, updateDoc, where } from 'firebase/firestore'
 
 const router = Router()

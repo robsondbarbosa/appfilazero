@@ -1,5 +1,5 @@
 import { whatsappService } from './whatsapp.service';
-import { db as adminDb } from '@filazero/firebase/admin';
+import { db as adminDb } from '@filazero/firebase/server';
 import { addDoc, collection } from 'firebase/firestore';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
 

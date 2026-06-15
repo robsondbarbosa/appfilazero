@@ -1,8 +1,7 @@
 import { Router, type Request, type Response } from 'express'
-import { db as adminDb } from '@filazero/firebase/admin'
+import { db as adminDb } from '@filazero/firebase/server'
 import { AppointmentStatus } from '@filazero/types'
 import {
-  addDoc,
   collection,
   doc,
   getDocs,
@@ -102,15 +101,18 @@ router.post('/', async (req: Request<TenantParams>, res: Response) => {
     // Transaction to prevent double-booking
     const result = await runTransaction(adminDb, async (transaction) => {
       // Check for conflicts
-      const conflictsQuery = await getDocs(
+      const conflictsSnapshot = await ((transaction as unknown) as {
+        get: (value: unknown) => Promise<{ docs: QueryDocumentSnapshot<DocumentData>[] }>
+      }).get(
         query(
           appointmentsCollection,
+          where('tenantId', '==', tenantId),
           where('professionalId', '==', professionalId),
           where('status', 'not-in', ['CANCELLED', 'NO_SHOW'])
         )
       )
       
-      const conflicts = conflictsQuery.docs.filter((appointmentDoc) => {
+      const conflicts = conflictsSnapshot.docs.filter((appointmentDoc) => {
         const apt = appointmentDoc.data()
         const aptStart = apt.dateTime.toDate()
         const aptEnd = new Date(aptStart.getTime() + apt.duration * 60000)
