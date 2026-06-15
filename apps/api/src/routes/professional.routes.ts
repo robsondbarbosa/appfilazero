@@ -1,7 +1,9 @@
 import { Router, type Request, type Response } from 'express'
-import { adminDb } from '@filazero/firebase'
+import { db as adminDb } from '@filazero/firebase/admin'
+import { addDoc, collection, getDocs, query, where } from 'firebase/firestore'
 
 const router = Router({ mergeParams: true })
+const professionalsCollection = collection(adminDb, 'professionals')
 
 type TenantParams = {
   tenantId: string
@@ -12,11 +14,13 @@ router.get('/', async (req: Request<TenantParams>, res: Response) => {
   try {
     const { tenantId } = req.params
     
-    const snapshot = await adminDb
-      .collection('professionals')
-      .where('tenantId', '==', tenantId)
-      .where('isActive', '==', true)
-      .get()
+    const snapshot = await getDocs(
+      query(
+        professionalsCollection,
+        where('tenantId', '==', tenantId),
+        where('isActive', '==', true)
+      )
+    )
     
     const professionals = snapshot.docs.map(doc => ({
       id: doc.id,
@@ -47,7 +51,7 @@ router.post('/', async (req: Request<TenantParams>, res: Response) => {
       updatedAt: new Date()
     }
     
-    const docRef = await adminDb.collection('professionals').add(professionalData)
+    const docRef = await addDoc(professionalsCollection, professionalData)
     
     res.status(201).json({ id: docRef.id, ...professionalData })
   } catch (error) {

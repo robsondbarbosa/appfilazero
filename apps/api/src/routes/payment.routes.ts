@@ -1,9 +1,21 @@
 import { Router, type Request, type Response } from 'express'
 import { MercadoPagoConfig, Preference } from 'mercadopago'
-import { adminDb } from '@filazero/firebase'
+import { db as adminDb } from '@filazero/firebase/admin'
 import { notificationService } from '../services/notification.service'
+import {
+  collection,
+  doc,
+  getDoc,
+  runTransaction,
+  updateDoc,
+} from 'firebase/firestore'
 
 const router = Router({ mergeParams: true })
+const tenantsCollection = collection(adminDb, 'tenants')
+const appointmentsCollection = collection(adminDb, 'appointments')
+const servicesCollection = collection(adminDb, 'services')
+const professionalsCollection = collection(adminDb, 'professionals')
+const paymentsCollection = collection(adminDb, 'payments')
 
 type TenantParams = {
   tenantId: string
@@ -16,7 +28,7 @@ router.post('/create', async (req: Request<TenantParams>, res: Response) => {
     const { appointmentId } = req.body
     
     // Get tenant data
-    const tenantDoc = await adminDb.collection('tenants').doc(tenantId).get()
+    const tenantDoc = await getDoc(doc(tenantsCollection, tenantId))
     const tenant = tenantDoc.data()
     
     if (!tenant?.mpAccessToken) {
@@ -24,7 +36,7 @@ router.post('/create', async (req: Request<TenantParams>, res: Response) => {
     }
     
     // Get appointment data
-    const appointmentDoc = await adminDb.collection('appointments').doc(appointmentId).get()
+    const appointmentDoc = await getDoc(doc(appointmentsCollection, appointmentId))
     const appointment = appointmentDoc.data()
     
     if (!appointment) {
@@ -32,7 +44,7 @@ router.post('/create', async (req: Request<TenantParams>, res: Response) => {
     }
     
     // Get service data
-    const serviceDoc = await adminDb.collection('services').doc(appointment.serviceId).get()
+    const serviceDoc = await getDoc(doc(servicesCollection, appointment.serviceId))
     const service = serviceDoc.data()
     
     // Create Mercado Pago preference
@@ -64,7 +76,7 @@ router.post('/create', async (req: Request<TenantParams>, res: Response) => {
     })
     
     // Update payment record
-    await adminDb.collection('payments').doc(appointmentId).update({
+    await updateDoc(doc(paymentsCollection, appointmentId), {
       mpPreferenceId: result.id,
       updatedAt: new Date()
     })
@@ -109,15 +121,15 @@ router.post('/mercadopago', async (req: Request, res: Response) => {
         }
         
         // Update in transaction
-        await adminDb.runTransaction(async (transaction) => {
-          const paymentRef = adminDb.collection('payments').doc(appointmentId)
+        await runTransaction(adminDb, async (transaction) => {
+          const paymentRef = doc(paymentsCollection, appointmentId)
           transaction.update(paymentRef, {
             status: 'APPROVED',
             mpPaymentId,
             paidAt: new Date()
           })
           
-          const appointmentRef = adminDb.collection('appointments').doc(appointmentId)
+          const appointmentRef = doc(appointmentsCollection, appointmentId)
           transaction.update(appointmentRef, {
             status: 'CONFIRMED',
             confirmedAt: new Date()
@@ -128,14 +140,14 @@ router.post('/mercadopago', async (req: Request, res: Response) => {
         
         // Enviar notificação WhatsApp de confirmação
         try {
-          const appointmentDoc = await adminDb.collection('appointments').doc(appointmentId).get()
+          const appointmentDoc = await getDoc(doc(appointmentsCollection, appointmentId))
           const appointment = appointmentDoc.data()
           
           if (appointment) {
             const [serviceDoc, professionalDoc, tenantDoc] = await Promise.all([
-              adminDb.collection('services').doc(appointment.serviceId).get(),
-              adminDb.collection('professionals').doc(appointment.professionalId).get(),
-              adminDb.collection('tenants').doc(tenantId).get()
+              getDoc(doc(servicesCollection, appointment.serviceId)),
+              getDoc(doc(professionalsCollection, appointment.professionalId)),
+              getDoc(doc(tenantsCollection, tenantId))
             ])
             
             const service = serviceDoc.data()

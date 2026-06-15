@@ -1,7 +1,20 @@
 import { Router, type Request, type Response } from 'express'
-import { adminDb } from '@filazero/firebase'
+import { db as adminDb } from '@filazero/firebase/admin'
 import { AppointmentStatus } from '@filazero/types'
-import type { Query } from 'firebase-admin/firestore'
+import {
+  addDoc,
+  collection,
+  doc,
+  getDocs,
+  orderBy,
+  query,
+  runTransaction,
+  updateDoc,
+  where,
+  type Query,
+  type QueryDocumentSnapshot,
+  type DocumentData,
+} from 'firebase/firestore'
 
 type TenantParams = {
   tenantId: string
@@ -17,26 +30,35 @@ type AppointmentRecord = {
 
 const router = Router({ mergeParams: true })
 
+const appointmentsCollection = collection(adminDb, 'appointments')
+const paymentsCollection = collection(adminDb, 'payments')
+
 // Get appointments for tenant
 router.get('/', async (req: Request<TenantParams>, res: Response) => {
   try {
     const { tenantId } = req.params
     const { professionalId, date } = req.query
     
-    let query: Query = adminDb
-      .collection('appointments')
-      .where('tenantId', '==', tenantId)
-      .orderBy('dateTime', 'asc')
+    let appointmentsQuery: Query<DocumentData> = query(
+      appointmentsCollection,
+      where('tenantId', '==', tenantId),
+      orderBy('dateTime', 'asc')
+    )
     
     if (professionalId) {
-      query = query.where('professionalId', '==', professionalId)
+      appointmentsQuery = query(
+        appointmentsCollection,
+        where('tenantId', '==', tenantId),
+        where('professionalId', '==', professionalId),
+        orderBy('dateTime', 'asc')
+      )
     }
     
-    const snapshot = await query.get()
+    const snapshot = await getDocs(appointmentsQuery)
     
-    let appointments: AppointmentRecord[] = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
+    let appointments: AppointmentRecord[] = snapshot.docs.map((appointmentDoc: QueryDocumentSnapshot<DocumentData>) => ({
+      id: appointmentDoc.id,
+      ...appointmentDoc.data()
     })) as AppointmentRecord[]
     
     // Filter by date if provided (client-side filtering for date range)
@@ -78,16 +100,18 @@ router.post('/', async (req: Request<TenantParams>, res: Response) => {
     const endTime = new Date(startTime.getTime() + duration * 60000)
     
     // Transaction to prevent double-booking
-    const result = await adminDb.runTransaction(async (transaction) => {
+    const result = await runTransaction(adminDb, async (transaction) => {
       // Check for conflicts
-      const conflictsQuery = await adminDb
-        .collection('appointments')
-        .where('professionalId', '==', professionalId)
-        .where('status', 'not-in', ['CANCELLED', 'NO_SHOW'])
-        .get()
+      const conflictsQuery = await getDocs(
+        query(
+          appointmentsCollection,
+          where('professionalId', '==', professionalId),
+          where('status', 'not-in', ['CANCELLED', 'NO_SHOW'])
+        )
+      )
       
-      const conflicts = conflictsQuery.docs.filter(doc => {
-        const apt = doc.data()
+      const conflicts = conflictsQuery.docs.filter((appointmentDoc) => {
+        const apt = appointmentDoc.data()
         const aptStart = apt.dateTime.toDate()
         const aptEnd = new Date(aptStart.getTime() + apt.duration * 60000)
         
@@ -99,7 +123,7 @@ router.post('/', async (req: Request<TenantParams>, res: Response) => {
       }
       
       // Create appointment
-      const appointmentRef = adminDb.collection('appointments').doc()
+      const appointmentRef = doc(appointmentsCollection)
       const appointmentData = {
         tenantId,
         clientName,
@@ -119,7 +143,7 @@ router.post('/', async (req: Request<TenantParams>, res: Response) => {
       transaction.set(appointmentRef, appointmentData)
       
       // Create payment record
-      const paymentRef = adminDb.collection('payments').doc(appointmentRef.id)
+      const paymentRef = doc(paymentsCollection, appointmentRef.id)
       transaction.set(paymentRef, {
         appointmentId: appointmentRef.id,
         tenantId,
@@ -146,7 +170,7 @@ router.put('/:id/cancel', async (req: Request<{ id: string }>, res: Response) =>
   try {
     const { id } = req.params
     
-    await adminDb.collection('appointments').doc(id).update({
+    await updateDoc(doc(appointmentsCollection, id), {
       status: AppointmentStatus.CANCELLED,
       cancelledAt: new Date(),
       updatedAt: new Date()

@@ -1,4 +1,5 @@
-import { adminDb } from '@filazero/firebase';
+import { db as adminDb } from '@filazero/firebase/admin';
+import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { notificationService } from '../services/notification.service';
 
 type BirthDateValue = string | Date | { toDate?: () => Date };
@@ -32,10 +33,9 @@ export async function checkBirthdaysAndNotify(): Promise<void> {
     const todayDay = today.getDate(); // 1-31
     
     // Buscar todos os tenants ativos
-    const tenantsSnapshot = await adminDb
-      .collection('tenants')
-      .where('isActive', '==', true)
-      .get();
+    const tenantsSnapshot = await getDocs(
+      query(collection(adminDb, 'tenants'), where('isActive', '==', true))
+    );
     
     console.log(`[Birthday] Verificando ${tenantsSnapshot.size} estabelecimentos`);
     
@@ -45,10 +45,9 @@ export async function checkBirthdaysAndNotify(): Promise<void> {
       
       // Buscar clientes que fizeram agendamentos neste tenant
       // e que fazem aniversário hoje
-      const appointmentsSnapshot = await adminDb
-        .collection('appointments')
-        .where('tenantId', '==', tenantId)
-        .get();
+      const appointmentsSnapshot = await getDocs(
+        query(collection(adminDb, 'appointments'), where('tenantId', '==', tenantId))
+      );
       
       // Agrupar clientes únicos por email
       const uniqueClients = new Map<string, {
@@ -95,7 +94,7 @@ export async function checkBirthdaysAndNotify(): Promise<void> {
             
             if (sent) {
               // Salvar código de desconto no Firestore
-              await adminDb.collection('birthdayDiscounts').add({
+              await addDoc(collection(adminDb, 'birthdayDiscounts'), {
                 tenantId,
                 clientEmail: email,
                 clientName: client.name,

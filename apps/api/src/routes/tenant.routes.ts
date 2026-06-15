@@ -1,18 +1,20 @@
 import { Router } from 'express'
-import { adminDb } from '@filazero/firebase'
+import { db as adminDb } from '@filazero/firebase/admin'
+import { addDoc, collection, doc, getDoc, getDocs, limit, query, updateDoc, where } from 'firebase/firestore'
 
 const router = Router()
+const tenantsCollection = collection(adminDb, 'tenants')
 
 router.get('/id/:id', async (req, res) => {
   try {
     const { id } = req.params
-    const doc = await adminDb.collection('tenants').doc(id).get()
+    const tenantDoc = await getDoc(doc(tenantsCollection, id))
 
-    if (!doc.exists) {
+    if (!tenantDoc.exists()) {
       return res.status(404).json({ error: 'Tenant not found' })
     }
 
-    const tenant = doc.data()
+    const tenant = tenantDoc.data()
 
     if (!tenant) {
       return res.status(404).json({ error: 'Tenant not found' })
@@ -21,7 +23,7 @@ router.get('/id/:id', async (req, res) => {
     delete tenant.mpAccessToken
     delete tenant.mpPublicKey
 
-    res.json({ id: doc.id, ...tenant })
+    res.json({ id: tenantDoc.id, ...tenant })
   } catch (error) {
     console.error('Error fetching tenant by id:', error)
     res.status(500).json({ error: 'Internal server error' })
@@ -32,12 +34,14 @@ router.get('/:slug', async (req, res) => {
   try {
     const { slug } = req.params
     
-    const snapshot = await adminDb
-      .collection('tenants')
-      .where('slug', '==', slug)
-      .where('isActive', '==', true)
-      .limit(1)
-      .get()
+    const snapshot = await getDocs(
+      query(
+        tenantsCollection,
+        where('slug', '==', slug),
+        where('isActive', '==', true),
+        limit(1)
+      )
+    )
     
     if (snapshot.empty) {
       return res.status(404).json({ error: 'Tenant not found' })
@@ -60,11 +64,7 @@ router.post('/', async (req, res) => {
     const { name, slug, email, plan = 'FREE' } = req.body
     
     // Check if slug already exists
-    const existing = await adminDb
-      .collection('tenants')
-      .where('slug', '==', slug)
-      .limit(1)
-      .get()
+    const existing = await getDocs(query(tenantsCollection, where('slug', '==', slug), limit(1)))
     
     if (!existing.empty) {
       return res.status(400).json({ error: 'Slug already exists' })
@@ -86,7 +86,7 @@ router.post('/', async (req, res) => {
       updatedAt: new Date()
     }
     
-    const docRef = await adminDb.collection('tenants').add(tenantData)
+    const docRef = await addDoc(tenantsCollection, tenantData)
     
     res.status(201).json({ id: docRef.id, ...tenantData })
   } catch (error) {
@@ -98,10 +98,10 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params
-    const tenantRef = adminDb.collection('tenants').doc(id)
-    const tenantDoc = await tenantRef.get()
+    const tenantRef = doc(tenantsCollection, id)
+    const tenantDoc = await getDoc(tenantRef)
 
-    if (!tenantDoc.exists) {
+    if (!tenantDoc.exists()) {
       return res.status(404).json({ error: 'Tenant not found' })
     }
 
@@ -142,7 +142,7 @@ router.put('/:id', async (req, res) => {
       updatedAt: new Date(),
     }
 
-    await tenantRef.update(updates)
+    await updateDoc(tenantRef, updates)
 
     const nextTenant: Record<string, unknown> = {
       ...tenantDoc.data(),

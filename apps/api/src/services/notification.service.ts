@@ -1,5 +1,6 @@
 import { whatsappService } from './whatsapp.service';
-import { adminDb } from '@filazero/firebase';
+import { db as adminDb } from '@filazero/firebase/admin';
+import { addDoc, collection } from 'firebase/firestore';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
 
 interface AppointmentNotificationData {
@@ -230,7 +231,7 @@ export class NotificationService {
     data: any;
   }): Promise<void> {
     try {
-      await adminDb.collection('notificationLogs').add({
+      await addDoc(collection(adminDb, 'notificationLogs'), {
         ...logData,
         createdAt: new Date()
       });

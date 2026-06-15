@@ -1,52 +1,59 @@
-// Admin-side Firebase (API)
-import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
-import { getFirestore, Firestore } from 'firebase-admin/firestore';
-import { getAuth, Auth } from 'firebase-admin/auth';
-import { getStorage, Storage } from 'firebase-admin/storage';
+import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
+import { getAuth, type Auth } from 'firebase/auth';
+import {
+  collection,
+  doc,
+  getFirestore,
+  query,
+  where,
+  type CollectionReference,
+  type DocumentReference,
+  type Firestore,
+  type Query,
+  type DocumentData,
+} from 'firebase/firestore';
 
-function createAdminApp(): App {
-  if (getApps().length > 0) {
-    return getApps()[0]!;
-  }
+const firebaseConfig = {
+  apiKey: process.env.FIREBASE_API_KEY || 'AIzaSyBt16NKxV0elaCebh1CN8tTs-rkxqb1AQc',
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN || 'appfilazero.firebaseapp.com',
+  projectId: process.env.FIREBASE_PROJECT_ID || 'appfilazero',
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || 'appfilazero.firebasestorage.app',
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '55912409258',
+  appId: process.env.FIREBASE_APP_ID || '1:55912409258:web:c244f6d54cf648bd8508d3',
+};
 
-  if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]!;
+const db: Firestore = getFirestore(app);
+const auth: Auth = getAuth(app);
+const storage = null;
 
-    return initializeApp({
-      credential: cert(serviceAccount),
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-    });
-  }
-
-  return initializeApp({
-    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-  });
+export function getTenantRef(tenantId: string): DocumentReference<DocumentData> {
+  return doc(db, 'tenants', tenantId);
 }
 
-const app = createAdminApp();
-const db = getFirestore(app);
-const auth = getAuth(app);
-const storage = getStorage(app);
-
-// Helper functions for Firestore queries
-export function getTenantRef(tenantId: string) {
-  return db.collection('tenants').doc(tenantId);
+export function getServicesQuery(tenantId: string): Query<DocumentData> {
+  return query(collection(db, 'services'), where('tenantId', '==', tenantId));
 }
 
-export function getServicesQuery(tenantId: string) {
-  return db.collection('services').where('tenantId', '==', tenantId);
+export function getProfessionalsQuery(tenantId: string): Query<DocumentData> {
+  return query(collection(db, 'professionals'), where('tenantId', '==', tenantId));
 }
 
-export function getProfessionalsQuery(tenantId: string) {
-  return db.collection('professionals').where('tenantId', '==', tenantId);
+export function getAppointmentsQuery(tenantId: string): Query<DocumentData> {
+  return query(collection(db, 'appointments'), where('tenantId', '==', tenantId));
 }
 
-export function getAppointmentsQuery(tenantId: string) {
-  return db.collection('appointments').where('tenantId', '==', tenantId);
+export function getPaymentsQuery(tenantId: string): Query<DocumentData> {
+  return query(collection(db, 'payments'), where('tenantId', '==', tenantId));
 }
 
-export function getPaymentsQuery(tenantId: string) {
-  return db.collection('payments').where('tenantId', '==', tenantId);
+export function getCollection<T extends DocumentData = DocumentData>(path: string): CollectionReference<T> {
+  return collection(db, path) as CollectionReference<T>;
+}
+
+export function getDocument<T extends DocumentData = DocumentData>(path: string, id: string): DocumentReference<T> {
+  return doc(db, path, id) as DocumentReference<T>;
 }
 
 export { app, db, auth, storage };
+
