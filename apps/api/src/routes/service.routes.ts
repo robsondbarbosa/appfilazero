@@ -1,19 +1,9 @@
 import { Router, type Request, type Response } from 'express'
 import { db as adminDb } from '@filazero/firebase/server'
-import {
-  addDoc,
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  orderBy,
-  query,
-  updateDoc,
-  where,
-} from 'firebase/firestore'
+import { FieldValue } from 'firebase-admin/firestore'
 
 const router = Router({ mergeParams: true })
-const servicesCollection = collection(adminDb, 'services')
+const servicesCollection = adminDb.collection('services')
 
 type TenantParams = {
   tenantId: string
@@ -23,21 +13,18 @@ type TenantParams = {
 router.get('/', async (req: Request<TenantParams>, res: Response) => {
   try {
     const { tenantId } = req.params
-    
-    const snapshot = await getDocs(
-      query(
-        servicesCollection,
-        where('tenantId', '==', tenantId),
-        where('isActive', '==', true),
-        orderBy('order', 'asc')
-      )
-    )
-    
+
+    const snapshot = await servicesCollection
+      .where('tenantId', '==', tenantId)
+      .where('isActive', '==', true)
+      .orderBy('order', 'asc')
+      .get()
+
     const services = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     }))
-    
+
     res.json(services)
   } catch (error) {
     console.error('Error fetching services:', error)
@@ -50,7 +37,7 @@ router.post('/', async (req: Request<TenantParams>, res: Response) => {
   try {
     const { tenantId } = req.params
     const { name, description, duration, price } = req.body
-    
+
     const serviceData = {
       tenantId,
       name,
@@ -59,12 +46,12 @@ router.post('/', async (req: Request<TenantParams>, res: Response) => {
       price,
       isActive: true,
       order: 0,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
     }
-    
-    const docRef = await addDoc(servicesCollection, serviceData)
-    
+
+    const docRef = await servicesCollection.add(serviceData)
+
     res.status(201).json({ id: docRef.id, ...serviceData })
   } catch (error) {
     console.error('Error creating service:', error)
@@ -77,24 +64,24 @@ router.put('/:id', async (req: Request<TenantParams & { id: string }>, res: Resp
     const { tenantId, id } = req.params
     const { name, description, duration, price, order, isActive } = req.body
 
-    const serviceRef = doc(servicesCollection, id)
-    const serviceDoc = await getDoc(serviceRef)
+    const serviceRef = servicesCollection.doc(id)
+    const serviceDoc = await serviceRef.get()
 
-    if (!serviceDoc.exists() || serviceDoc.data()?.tenantId !== tenantId) {
+    if (!serviceDoc.exists || serviceDoc.data()?.tenantId !== tenantId) {
       return res.status(404).json({ error: 'Service not found' })
     }
 
-    const updates = {
+    const updates: Record<string, unknown> = {
       ...(typeof name === 'string' ? { name } : {}),
       ...(typeof description === 'string' ? { description } : {}),
       ...(typeof duration === 'number' ? { duration } : {}),
       ...(typeof price === 'number' ? { price } : {}),
       ...(typeof order === 'number' ? { order } : {}),
       ...(typeof isActive === 'boolean' ? { isActive } : {}),
-      updatedAt: new Date(),
+      updatedAt: FieldValue.serverTimestamp(),
     }
 
-    await updateDoc(serviceRef, updates)
+    await serviceRef.update(updates)
 
     res.json({ id, ...serviceDoc.data(), ...updates })
   } catch (error) {
@@ -106,16 +93,16 @@ router.put('/:id', async (req: Request<TenantParams & { id: string }>, res: Resp
 router.delete('/:id', async (req: Request<TenantParams & { id: string }>, res: Response) => {
   try {
     const { tenantId, id } = req.params
-    const serviceRef = doc(servicesCollection, id)
-    const serviceDoc = await getDoc(serviceRef)
+    const serviceRef = servicesCollection.doc(id)
+    const serviceDoc = await serviceRef.get()
 
-    if (!serviceDoc.exists() || serviceDoc.data()?.tenantId !== tenantId) {
+    if (!serviceDoc.exists || serviceDoc.data()?.tenantId !== tenantId) {
       return res.status(404).json({ error: 'Service not found' })
     }
 
-    await updateDoc(serviceRef, {
+    await serviceRef.update({
       isActive: false,
-      updatedAt: new Date(),
+      updatedAt: FieldValue.serverTimestamp(),
     })
 
     res.json({ success: true })

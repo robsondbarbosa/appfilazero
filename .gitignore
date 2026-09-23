@@ -4,6 +4,25 @@ gympro/
 gym-manager/
 gym-manager-pro/
 atendimento-tecnico/
+appfilazero-deploy/
+appfilazero-web/
+multiatendente-whatsapp/
+sistema-web-escola/
+analise-como-esta-o/
+rti-contracts/
+GB Calçdos/
+
+# Arquivos temporários de trabalho
+.commit-msg.txt
+reset-output.txt
+stash-output.txt
+push-output.txt
+pull-output.txt
+tracked-files.txt
+npm-output.txt
+build-output.txt
+typecheck-output.txt
+clean-output.txt
 
 # Dependências
 node_modules/

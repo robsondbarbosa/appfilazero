@@ -1,6 +1,6 @@
-import { whatsappService } from './whatsapp.service';
 import { db as adminDb } from '@filazero/firebase/server';
-import { addDoc, collection } from 'firebase/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
+import { whatsappService } from './whatsapp.service';
 import { formatCurrency, formatDateTime } from '../utils/formatters';
 
 interface AppointmentNotificationData {
@@ -23,18 +23,14 @@ interface BirthdayNotificationData {
 }
 
 export class NotificationService {
-  /**
-   * Envia confirmação de agendamento via WhatsApp
-   */
   async sendAppointmentConfirmation(data: AppointmentNotificationData): Promise<boolean> {
     const message = this.buildAppointmentMessage(data);
-    
+
     const result = await whatsappService.sendTextMessage({
       phoneNumber: data.clientPhone,
       message
     });
 
-    // Registrar envio no Firestore
     await this.logNotification({
       type: 'APPOINTMENT_CONFIRMATION',
       phoneNumber: data.clientPhone,
@@ -45,12 +41,9 @@ export class NotificationService {
     return result;
   }
 
-  /**
-   * Envia lembrete de agendamento (24h antes)
-   */
   async sendAppointmentReminder(data: AppointmentNotificationData): Promise<boolean> {
     const message = this.buildReminderMessage(data);
-    
+
     const result = await whatsappService.sendTextMessage({
       phoneNumber: data.clientPhone,
       message
@@ -66,12 +59,9 @@ export class NotificationService {
     return result;
   }
 
-  /**
-   * Envia mensagem de parabéns de aniversário
-   */
   async sendBirthdayMessage(data: BirthdayNotificationData): Promise<boolean> {
     const message = this.buildBirthdayMessage(data);
-    
+
     const result = await whatsappService.sendTextMessage({
       phoneNumber: data.clientPhone,
       message
@@ -87,15 +77,12 @@ export class NotificationService {
     return result;
   }
 
-  /**
-   * Envia notificação de cancelamento
-   */
   async sendCancellationNotification(
     data: AppointmentNotificationData,
     reason?: string
   ): Promise<boolean> {
     const message = this.buildCancellationMessage(data, reason);
-    
+
     const result = await whatsappService.sendTextMessage({
       phoneNumber: data.clientPhone,
       message
@@ -111,19 +98,16 @@ export class NotificationService {
     return result;
   }
 
-  /**
-   * Constrói mensagem de confirmação de agendamento
-   */
   private buildAppointmentMessage(data: AppointmentNotificationData): string {
-    const { 
-      clientName, 
-      serviceName, 
-      professionalName, 
-      dateTime, 
+    const {
+      clientName,
+      serviceName,
+      professionalName,
+      dateTime,
       price,
       tenantName,
       tenantAddress,
-      tenantPhone 
+      tenantPhone
     } = data;
 
     let message = `✅ *Agendamento Confirmado!*\n\n`;
@@ -133,32 +117,29 @@ export class NotificationService {
     message += `💇‍♂️ *Profissional:* ${professionalName}\n`;
     message += `📅 *Data:* ${formatDateTime(dateTime)}\n`;
     message += `💰 *Valor:* ${formatCurrency(price)}\n`;
-    
+
     if (tenantAddress) {
       message += `📍 *Endereço:* ${tenantAddress}\n`;
     }
-    
+
     message += `\n⏰ *Chegue 10 minutos antes do horário.*\n\n`;
-    
+
     if (tenantPhone) {
       message += `📞 Dúvidas? Fale conosco: ${tenantPhone}\n\n`;
     }
-    
+
     message += `Agradecemos a preferência! 💛`;
 
     return message;
   }
 
-  /**
-   * Constrói mensagem de lembrete
-   */
   private buildReminderMessage(data: AppointmentNotificationData): string {
-    const { 
-      clientName, 
-      serviceName, 
-      professionalName, 
+    const {
+      clientName,
+      serviceName,
+      professionalName,
       dateTime,
-      tenantName 
+      tenantName
     } = data;
 
     let message = `⏰ *Lembrete de Agendamento*\n\n`;
@@ -174,9 +155,6 @@ export class NotificationService {
     return message;
   }
 
-  /**
-   * Constrói mensagem de parabéns de aniversário
-   */
   private buildBirthdayMessage(data: BirthdayNotificationData): string {
     const { clientName, tenantName, discountCode } = data;
 
@@ -184,23 +162,20 @@ export class NotificationService {
     message += `Olá ${clientName.split(' ')[0]}!\n\n`;
     message += `A equipe do *${tenantName}* deseja um dia incrível e cheio de alegria! 🥳\n\n`;
     message += `Que seu novo ano de vida seja repleto de conquistas, saúde e momentos especiais.\n\n`;
-    
+
     if (discountCode) {
       message += `🎁 *Presente especial:*\n`;
       message += `Use o código *${discountCode}* e ganhe *20% OFF* no seu próximo agendamento!\n\n`;
       message += `Válido por 7 dias. Não perca! 😉\n\n`;
     }
-    
+
     message += `Parabéns! 🎈🎊`;
 
     return message;
   }
 
-  /**
-   * Constrói mensagem de cancelamento
-   */
   private buildCancellationMessage(
-    data: AppointmentNotificationData, 
+    data: AppointmentNotificationData,
     reason?: string
   ): string {
     const { clientName, serviceName, dateTime, tenantName } = data;
@@ -210,20 +185,17 @@ export class NotificationService {
     message += `Seu agendamento em *${tenantName}* foi cancelado:\n\n`;
     message += `📋 *Serviço:* ${serviceName}\n`;
     message += `📅 *Data:* ${formatDateTime(dateTime)}\n`;
-    
+
     if (reason) {
       message += `📝 *Motivo:* ${reason}\n`;
     }
-    
+
     message += `\nPara reagendar, acesse nosso site ou entre em contato.\n\n`;
     message += `Agradecemos a compreensão! 💛`;
 
     return message;
   }
 
-  /**
-   * Registra notificação no Firestore
-   */
   private async logNotification(logData: {
     type: string;
     phoneNumber: string;
@@ -231,9 +203,9 @@ export class NotificationService {
     data: any;
   }): Promise<void> {
     try {
-      await addDoc(collection(adminDb, 'notificationLogs'), {
+      await adminDb.collection('notificationLogs').add({
         ...logData,
-        createdAt: new Date()
+        createdAt: FieldValue.serverTimestamp()
       });
     } catch (error) {
       console.error('[Notification] Erro ao registrar log:', error);
@@ -241,5 +213,4 @@ export class NotificationService {
   }
 }
 
-// Instância singleton
 export const notificationService = new NotificationService();

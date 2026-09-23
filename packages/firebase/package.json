@@ -24,7 +24,8 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "firebase": "^10.7.0"
+    "firebase": "^10.7.0",
+    "firebase-admin": "^12.0.0"
   },
   "devDependencies": {
     "rimraf": "^6.0.1",

@@ -1,16 +1,16 @@
-import { Router } from 'express'
+import { Router, type Request, type Response } from 'express'
 import { db as adminDb } from '@filazero/firebase/server'
-import { addDoc, collection, doc, getDoc, getDocs, limit, query, updateDoc, where } from 'firebase/firestore'
+import { FieldValue } from 'firebase-admin/firestore'
 
 const router = Router()
-const tenantsCollection = collection(adminDb, 'tenants')
+const tenantsCollection = adminDb.collection('tenants')
 
-router.get('/id/:id', async (req, res) => {
+router.get('/id/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const tenantDoc = await getDoc(doc(tenantsCollection, id))
+    const tenantDoc = await tenantsCollection.doc(id).get()
 
-    if (!tenantDoc.exists()) {
+    if (!tenantDoc.exists) {
       return res.status(404).json({ error: 'Tenant not found' })
     }
 
@@ -30,28 +30,25 @@ router.get('/id/:id', async (req, res) => {
   }
 })
 
-router.get('/:slug', async (req, res) => {
+router.get('/:slug', async (req: Request, res: Response) => {
   try {
     const { slug } = req.params
-    
-    const snapshot = await getDocs(
-      query(
-        tenantsCollection,
-        where('slug', '==', slug),
-        where('isActive', '==', true),
-        limit(1)
-      )
-    )
-    
+
+    const snapshot = await tenantsCollection
+      .where('slug', '==', slug)
+      .where('isActive', '==', true)
+      .limit(1)
+      .get()
+
     if (snapshot.empty) {
       return res.status(404).json({ error: 'Tenant not found' })
     }
-    
+
     const tenant = snapshot.docs[0].data()
     // Remove sensitive data
     delete tenant.mpAccessToken
     delete tenant.mpPublicKey
-    
+
     res.json({ id: snapshot.docs[0].id, ...tenant })
   } catch (error) {
     console.error('Error fetching tenant:', error)
@@ -59,17 +56,20 @@ router.get('/:slug', async (req, res) => {
   }
 })
 
-router.post('/', async (req, res) => {
+router.post('/', async (req: Request, res: Response) => {
   try {
     const { name, slug, email, plan = 'FREE' } = req.body
-    
+
     // Check if slug already exists
-    const existing = await getDocs(query(tenantsCollection, where('slug', '==', slug), limit(1)))
-    
+    const existing = await tenantsCollection
+      .where('slug', '==', slug)
+      .limit(1)
+      .get()
+
     if (!existing.empty) {
       return res.status(400).json({ error: 'Slug already exists' })
     }
-    
+
     const tenantData = {
       name,
       slug,
@@ -82,12 +82,12 @@ router.post('/', async (req, res) => {
       requirePayment: true,
       autoConfirm: false,
       isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp()
     }
-    
-    const docRef = await addDoc(tenantsCollection, tenantData)
-    
+
+    const docRef = await tenantsCollection.add(tenantData)
+
     res.status(201).json({ id: docRef.id, ...tenantData })
   } catch (error) {
     console.error('Error creating tenant:', error)
@@ -95,13 +95,13 @@ router.post('/', async (req, res) => {
   }
 })
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params
-    const tenantRef = doc(tenantsCollection, id)
-    const tenantDoc = await getDoc(tenantRef)
+    const tenantRef = tenantsCollection.doc(id)
+    const tenantDoc = await tenantRef.get()
 
-    if (!tenantDoc.exists()) {
+    if (!tenantDoc.exists) {
       return res.status(404).json({ error: 'Tenant not found' })
     }
 
@@ -139,10 +139,10 @@ router.put('/:id', async (req, res) => {
       ...(typeof cancelDeadline === 'number' ? { cancelDeadline } : {}),
       ...(typeof requirePayment === 'boolean' ? { requirePayment } : {}),
       ...(typeof autoConfirm === 'boolean' ? { autoConfirm } : {}),
-      updatedAt: new Date(),
+      updatedAt: FieldValue.serverTimestamp(),
     }
 
-    await updateDoc(tenantRef, updates)
+    await tenantRef.update(updates)
 
     const nextTenant: Record<string, unknown> = {
       ...tenantDoc.data(),

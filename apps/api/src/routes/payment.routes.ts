@@ -2,24 +2,14 @@ import { Router, type Request, type Response } from 'express'
 import { MercadoPagoConfig, Preference } from 'mercadopago'
 import { db as adminDb } from '@filazero/firebase/server'
 import { notificationService } from '../services/notification.service'
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  orderBy,
-  query,
-  runTransaction,
-  updateDoc,
-  where,
-} from 'firebase/firestore'
+import { FieldValue } from 'firebase-admin/firestore'
 
 const router = Router({ mergeParams: true })
-const tenantsCollection = collection(adminDb, 'tenants')
-const appointmentsCollection = collection(adminDb, 'appointments')
-const servicesCollection = collection(adminDb, 'services')
-const professionalsCollection = collection(adminDb, 'professionals')
-const paymentsCollection = collection(adminDb, 'payments')
+const tenantsCollection = adminDb.collection('tenants')
+const appointmentsCollection = adminDb.collection('appointments')
+const servicesCollection = adminDb.collection('services')
+const professionalsCollection = adminDb.collection('professionals')
+const paymentsCollection = adminDb.collection('payments')
 
 type TenantParams = {
   tenantId: string
@@ -70,7 +60,7 @@ async function fetchMercadoPagoPayment(
 }
 
 async function resolveMercadoPagoPayment(paymentId: string): Promise<MercadoPagoPaymentResponse | null> {
-  const tenantSnapshot = await getDocs(tenantsCollection)
+  const tenantSnapshot = await tenantsCollection.get()
   const accessTokens = new Set<string>()
 
   if (process.env.MERCADOPAGO_ACCESS_TOKEN) {
@@ -112,9 +102,10 @@ router.get('/', async (req: Request<TenantParams>, res: Response) => {
   try {
     const { tenantId } = req.params
 
-    const snapshot = await getDocs(
-      query(paymentsCollection, where('tenantId', '==', tenantId), orderBy('createdAt', 'desc'))
-    )
+    const snapshot = await paymentsCollection
+      .where('tenantId', '==', tenantId)
+      .orderBy('createdAt', 'desc')
+      .get()
 
     const payments = snapshot.docs.map((paymentDoc) => ({
       id: paymentDoc.id,
@@ -133,21 +124,21 @@ router.post('/create', async (req: Request<TenantParams>, res: Response) => {
     const { tenantId } = req.params
     const { appointmentId } = req.body
 
-    const tenantDoc = await getDoc(doc(tenantsCollection, tenantId))
+    const tenantDoc = await tenantsCollection.doc(tenantId).get()
     const tenant = tenantDoc.data()
 
     if (!tenant?.mpAccessToken) {
       return res.status(400).json({ error: 'Payment not configured for this tenant' })
     }
 
-    const appointmentDoc = await getDoc(doc(appointmentsCollection, appointmentId))
+    const appointmentDoc = await appointmentsCollection.doc(appointmentId).get()
     const appointment = appointmentDoc.data()
 
     if (!appointment) {
       return res.status(404).json({ error: 'Appointment not found' })
     }
 
-    const serviceDoc = await getDoc(doc(servicesCollection, appointment.serviceId))
+    const serviceDoc = await servicesCollection.doc(String(appointment.serviceId)).get()
     const service = serviceDoc.data()
 
     const client = new MercadoPagoConfig({
@@ -177,9 +168,9 @@ router.post('/create', async (req: Request<TenantParams>, res: Response) => {
       }
     })
 
-    await updateDoc(doc(paymentsCollection, appointmentId), {
+    await paymentsCollection.doc(appointmentId).update({
       mpPreferenceId: result.id,
-      updatedAt: new Date()
+      updatedAt: FieldValue.serverTimestamp()
     })
 
     const interactionData = (result as {
@@ -224,38 +215,35 @@ router.post('/mercadopago', async (req: Request, res: Response) => {
 
     const paymentStatus = mapMercadoPagoStatus(paymentDetails.status)
     const isApproved = paymentStatus === 'APPROVED'
-    const now = new Date()
 
-    await runTransaction(adminDb, async (transaction) => {
-      const paymentRef = doc(paymentsCollection, appointmentId)
-      const appointmentRef = doc(appointmentsCollection, appointmentId)
+    await adminDb.runTransaction(async (transaction) => {
+      const paymentRef = paymentsCollection.doc(appointmentId)
+      const appointmentRef = appointmentsCollection.doc(appointmentId)
 
       transaction.update(paymentRef, {
         status: paymentStatus,
         mpPaymentId: paymentDetails.id,
-        paidAt: isApproved ? now : null,
-        updatedAt: now,
+        ...(isApproved ? { paidAt: FieldValue.serverTimestamp() } : {}),
+        updatedAt: FieldValue.serverTimestamp(),
       })
 
       transaction.update(appointmentRef, {
         status: isApproved ? 'CONFIRMED' : 'PENDING',
-        confirmedAt: isApproved ? now : null,
-        updatedAt: now,
+        ...(isApproved ? { confirmedAt: FieldValue.serverTimestamp() } : {}),
+        updatedAt: FieldValue.serverTimestamp(),
       })
     })
 
     if (isApproved) {
-      console.log(`[Webhook] Payment approved for appointment ${appointmentId}`)
-
       try {
-        const appointmentDoc = await getDoc(doc(appointmentsCollection, appointmentId))
+        const appointmentDoc = await appointmentsCollection.doc(appointmentId).get()
         const appointment = appointmentDoc.data()
 
         if (appointment) {
           const [serviceDoc, professionalDoc, tenantDoc] = await Promise.all([
-            getDoc(doc(servicesCollection, appointment.serviceId)),
-            getDoc(doc(professionalsCollection, appointment.professionalId)),
-            getDoc(doc(tenantsCollection, tenantId)),
+            servicesCollection.doc(String(appointment.serviceId)).get(),
+            professionalsCollection.doc(String(appointment.professionalId)).get(),
+            tenantsCollection.doc(tenantId).get(),
           ])
 
           const service = serviceDoc.data()
@@ -267,14 +255,12 @@ router.post('/mercadopago', async (req: Request, res: Response) => {
             clientPhone: appointment.clientPhone,
             serviceName: service?.name || 'Serviço',
             professionalName: professional?.name || 'Profissional',
-            dateTime: appointment.dateTime.toDate(),
+            dateTime: (appointment.dateTime as FirebaseFirestore.Timestamp).toDate(),
             price: appointment.price,
             tenantName: tenant?.name || 'Estabelecimento',
             tenantAddress: tenant?.address,
             tenantPhone: tenant?.phone
           })
-
-          console.log(`[WhatsApp] Confirmação enviada para ${appointment.clientPhone}`)
         }
       } catch (notifyError) {
         console.error('[WhatsApp] Erro ao enviar confirmação:', notifyError)

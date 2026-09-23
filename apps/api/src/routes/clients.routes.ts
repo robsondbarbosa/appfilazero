@@ -1,6 +1,8 @@
 import { Router, type Request, type Response } from 'express'
 import { db as adminDb } from '@filazero/firebase/server'
-import { collection, getDocs, query, where } from 'firebase/firestore'
+
+const router = Router({ mergeParams: true })
+const appointmentsCollection = adminDb.collection('appointments')
 
 type TenantParams = {
   tenantId: string
@@ -21,13 +23,8 @@ type AppointmentClientData = {
   clientEmail?: string
   clientPhone?: string
   price?: number
-  dateTime?: {
-    toDate?: () => Date
-  } | Date | string
+  dateTime?: FirebaseFirestore.Timestamp | Date | string
 }
-
-const router = Router({ mergeParams: true })
-const appointmentsCollection = collection(adminDb, 'appointments')
 
 function toDate(value: AppointmentClientData['dateTime']): Date | null {
   if (value instanceof Date) {
@@ -50,7 +47,9 @@ router.get('/', async (req: Request<TenantParams>, res: Response) => {
   try {
     const { tenantId } = req.params
 
-    const snapshot = await getDocs(query(appointmentsCollection, where('tenantId', '==', tenantId)))
+    const snapshot = await appointmentsCollection
+      .where('tenantId', '==', tenantId)
+      .get()
 
     const clientsMap = new Map<string, ClientSummary>()
 

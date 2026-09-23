@@ -1,43 +1,42 @@
 import { db as adminDb } from '@filazero/firebase/server';
-import { collection, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import { notificationService } from '../services/notification.service';
+
+const appointmentsCollection = adminDb.collection('appointments');
+const paymentsCollection = adminDb.collection('payments');
+const servicesCollection = adminDb.collection('services');
+const professionalsCollection = adminDb.collection('professionals');
+const tenantsCollection = adminDb.collection('tenants');
 
 export async function cancelExpiredAppointments(): Promise<void> {
   try {
-    console.log('[Cron] Verificando agendamentos expirados...');
-
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    const expiredSnapshot = await getDocs(
-      query(
-        collection(adminDb, 'appointments'),
-        where('status', '==', 'PENDING'),
-        where('createdAt', '<=', fifteenMinutesAgo)
-      )
-    );
-
-    console.log(`[Cron] ${expiredSnapshot.size} agendamentos expirados encontrados`);
+    const expiredSnapshot = await appointmentsCollection
+      .where('status', '==', 'PENDING')
+      .where('createdAt', '<=', fifteenMinutesAgo)
+      .get();
 
     for (const appointmentDoc of expiredSnapshot.docs) {
       const appointment = appointmentDoc.data();
       const appointmentId = appointmentDoc.id;
 
-      await updateDoc(doc(adminDb, 'appointments', appointmentId), {
+      await appointmentsCollection.doc(appointmentId).update({
         status: 'CANCELLED',
-        cancelledAt: new Date(),
-        cancelReason: 'NÃ£o pagamento dentro do prazo',
-        updatedAt: new Date()
+        cancelledAt: FieldValue.serverTimestamp(),
+        cancelReason: 'Não pagamento dentro do prazo',
+        updatedAt: FieldValue.serverTimestamp()
       });
 
-      await updateDoc(doc(adminDb, 'payments', appointmentId), {
+      await paymentsCollection.doc(appointmentId).update({
         status: 'REJECTED',
-        updatedAt: new Date()
+        updatedAt: FieldValue.serverTimestamp()
       });
 
       try {
         const [serviceDoc, professionalDoc, tenantDoc] = await Promise.all([
-          getDoc(doc(adminDb, 'services', appointment.serviceId)),
-          getDoc(doc(adminDb, 'professionals', appointment.professionalId)),
-          getDoc(doc(adminDb, 'tenants', appointment.tenantId))
+          servicesCollection.doc(String(appointment.serviceId)).get(),
+          professionalsCollection.doc(String(appointment.professionalId)).get(),
+          tenantsCollection.doc(String(appointment.tenantId)).get()
         ]);
 
         const service = serviceDoc.data();
@@ -48,22 +47,18 @@ export async function cancelExpiredAppointments(): Promise<void> {
           {
             clientName: appointment.clientName,
             clientPhone: appointment.clientPhone,
-            serviceName: service?.name || 'ServiÃ§o',
+            serviceName: service?.name || 'Serviço',
             professionalName: professional?.name || 'Profissional',
-            dateTime: appointment.dateTime.toDate(),
+            dateTime: (appointment.dateTime as FirebaseFirestore.Timestamp).toDate(),
             price: appointment.price,
             tenantName: tenant?.name || 'Estabelecimento'
           },
-          'NÃ£o pagamento dentro do prazo de 15 minutos'
+          'Não pagamento dentro do prazo de 15 minutos'
         );
-
-        console.log(`[WhatsApp] Cancelamento notificado: ${appointment.clientPhone}`);
       } catch (notifyError) {
         console.error('[WhatsApp] Erro ao notificar cancelamento:', notifyError);
       }
     }
-
-    console.log(`[Cron] ${expiredSnapshot.size} agendamentos cancelados`);
   } catch (error) {
     console.error('[Cron] Erro ao cancelar agendamentos:', error);
   }
@@ -71,32 +66,25 @@ export async function cancelExpiredAppointments(): Promise<void> {
 
 export async function sendAppointmentReminders(): Promise<void> {
   try {
-    console.log('[Cron] Enviando lembretes de agendamento...');
-
     const now = new Date();
     const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
     const threeHoursFromNow = new Date(now.getTime() + 3 * 60 * 60 * 1000);
 
-    const appointmentsSnapshot = await getDocs(
-      query(
-        collection(adminDb, 'appointments'),
-        where('status', '==', 'CONFIRMED'),
-        where('dateTime', '>=', twoHoursFromNow),
-        where('dateTime', '<', threeHoursFromNow),
-        where('reminderSent', '!=', true)
-      )
-    );
-
-    console.log(`[Cron] ${appointmentsSnapshot.size} lembretes para enviar`);
+    const appointmentsSnapshot = await appointmentsCollection
+      .where('status', '==', 'CONFIRMED')
+      .where('dateTime', '>=', twoHoursFromNow)
+      .where('dateTime', '<', threeHoursFromNow)
+      .where('reminderSent', '!=', true)
+      .get();
 
     for (const appointmentDoc of appointmentsSnapshot.docs) {
       const appointment = appointmentDoc.data();
 
       try {
         const [serviceDoc, professionalDoc, tenantDoc] = await Promise.all([
-          getDoc(doc(adminDb, 'services', appointment.serviceId)),
-          getDoc(doc(adminDb, 'professionals', appointment.professionalId)),
-          getDoc(doc(adminDb, 'tenants', appointment.tenantId))
+          servicesCollection.doc(String(appointment.serviceId)).get(),
+          professionalsCollection.doc(String(appointment.professionalId)).get(),
+          tenantsCollection.doc(String(appointment.tenantId)).get()
         ]);
 
         const service = serviceDoc.data();
@@ -106,25 +94,21 @@ export async function sendAppointmentReminders(): Promise<void> {
         await notificationService.sendAppointmentReminder({
           clientName: appointment.clientName,
           clientPhone: appointment.clientPhone,
-          serviceName: service?.name || 'ServiÃ§o',
+          serviceName: service?.name || 'Serviço',
           professionalName: professional?.name || 'Profissional',
-          dateTime: appointment.dateTime.toDate(),
+          dateTime: (appointment.dateTime as FirebaseFirestore.Timestamp).toDate(),
           price: appointment.price,
           tenantName: tenant?.name || 'Estabelecimento'
         });
 
-        await updateDoc(appointmentDoc.ref, {
+        await appointmentsCollection.doc(appointmentDoc.id).update({
           reminderSent: true,
-          reminderSentAt: new Date()
+          reminderSentAt: FieldValue.serverTimestamp()
         });
-
-        console.log(`[WhatsApp] Lembrete enviado: ${appointment.clientPhone}`);
       } catch (notifyError) {
         console.error('[WhatsApp] Erro ao enviar lembrete:', notifyError);
       }
     }
-
-    console.log('[Cron] Lembretes enviados com sucesso');
   } catch (error) {
     console.error('[Cron] Erro ao enviar lembretes:', error);
   }
