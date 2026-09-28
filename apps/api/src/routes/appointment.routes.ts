@@ -133,10 +133,17 @@ router.post('/', async (req: Request<TenantParams>, res: Response) => {
         createdAt: FieldValue.serverTimestamp()
       })
 
-      return { id: appointmentRef.id, ...appointmentData }
+      return appointmentRef.id
     })
 
-    res.status(201).json(result)
+    const createdAppointmentDoc = await appointmentsCollection.doc(result).get()
+    const createdAppointment = createdAppointmentDoc.data()
+
+    if (!createdAppointment) {
+      return res.status(500).json({ error: 'Failed to create appointment' })
+    }
+
+    res.status(201).json({ id: result, ...createdAppointment })
   } catch (error: any) {
     if (error.message === 'TIME_CONFLICT') {
       return res.status(409).json({ error: 'Horário já reservado' })

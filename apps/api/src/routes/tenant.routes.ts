@@ -56,6 +56,17 @@ router.get('/:slug', async (req: Request, res: Response) => {
   }
 })
 
+function sanitizeTenantData(data: FirebaseFirestore.DocumentData | undefined): Record<string, unknown> | null {
+  if (!data) {
+    return null
+  }
+
+  const sanitized: Record<string, unknown> = { ...data }
+  delete sanitized.mpAccessToken
+  delete sanitized.mpPublicKey
+  return sanitized
+}
+
 router.post('/', async (req: Request, res: Response) => {
   try {
     const { name, slug, email, plan = 'FREE' } = req.body
@@ -87,8 +98,14 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     const docRef = await tenantsCollection.add(tenantData)
+    const createdDoc = await docRef.get()
+    const createdTenant = sanitizeTenantData(createdDoc.data())
 
-    res.status(201).json({ id: docRef.id, ...tenantData })
+    if (!createdTenant) {
+      return res.status(500).json({ error: 'Failed to create tenant' })
+    }
+
+    res.status(201).json({ id: docRef.id, ...createdTenant })
   } catch (error) {
     console.error('Error creating tenant:', error)
     res.status(500).json({ error: 'Internal server error' })
@@ -144,15 +161,14 @@ router.put('/:id', async (req: Request, res: Response) => {
 
     await tenantRef.update(updates)
 
-    const nextTenant: Record<string, unknown> = {
-      ...tenantDoc.data(),
-      ...updates,
+    const updatedDoc = await tenantRef.get()
+    const updatedTenant = sanitizeTenantData(updatedDoc.data())
+
+    if (!updatedTenant) {
+      return res.status(500).json({ error: 'Failed to update tenant' })
     }
 
-    delete nextTenant.mpAccessToken
-    delete nextTenant.mpPublicKey
-
-    res.json({ id, ...nextTenant })
+    res.json({ id, ...updatedTenant })
   } catch (error) {
     console.error('Error updating tenant:', error)
     res.status(500).json({ error: 'Internal server error' })

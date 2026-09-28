@@ -51,8 +51,9 @@ router.post('/', async (req: Request<TenantParams>, res: Response) => {
     }
 
     const docRef = await servicesCollection.add(serviceData)
+    const createdDoc = await docRef.get()
 
-    res.status(201).json({ id: docRef.id, ...serviceData })
+    res.status(201).json({ id: docRef.id, ...createdDoc.data() })
   } catch (error) {
     console.error('Error creating service:', error)
     res.status(500).json({ error: 'Internal server error' })
@@ -83,7 +84,9 @@ router.put('/:id', async (req: Request<TenantParams & { id: string }>, res: Resp
 
     await serviceRef.update(updates)
 
-    res.json({ id, ...serviceDoc.data(), ...updates })
+    const updatedDoc = await serviceRef.get()
+
+    res.json({ id, ...updatedDoc.data() })
   } catch (error) {
     console.error('Error updating service:', error)
     res.status(500).json({ error: 'Internal server error' })

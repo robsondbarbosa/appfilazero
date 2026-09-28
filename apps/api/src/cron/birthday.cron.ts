@@ -26,6 +26,8 @@ function normalizeBirthDate(value: BirthDateValue): Date {
 
 export async function checkBirthdaysAndNotify(): Promise<void> {
   try {
+    console.log('[Birthday] Verificando aniversários do dia...');
+
     const today = new Date();
     const todayMonth = today.getMonth() + 1;
     const todayDay = today.getDate();
@@ -34,6 +36,8 @@ export async function checkBirthdaysAndNotify(): Promise<void> {
     const tenantsSnapshot = await tenantsCollection
       .where('isActive', '==', true)
       .get();
+
+    console.log(`[Birthday] Verificando ${tenantsSnapshot.size} estabelecimentos`);
 
     for (const tenantDoc of tenantsSnapshot.docs) {
       const tenant = tenantDoc.data();
@@ -96,11 +100,15 @@ export async function checkBirthdaysAndNotify(): Promise<void> {
                 used: false,
                 createdAt: FieldValue.serverTimestamp()
               });
+
+              console.log(`[Birthday] Mensagem enviada para ${client.name} com código ${discountCode}`);
             }
           }
         }
       }
     }
+
+    console.log('[Birthday] Verificação de aniversários concluída');
   } catch (error) {
     console.error('[Birthday] Erro ao verificar aniversários:', error);
   }

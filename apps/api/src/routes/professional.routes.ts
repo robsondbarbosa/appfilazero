@@ -50,8 +50,9 @@ router.post('/', async (req: Request<TenantParams>, res: Response) => {
     }
 
     const docRef = await professionalsCollection.add(professionalData)
+    const createdDoc = await docRef.get()
 
-    res.status(201).json({ id: docRef.id, ...professionalData })
+    res.status(201).json({ id: docRef.id, ...createdDoc.data() })
   } catch (error) {
     console.error('Error creating professional:', error)
     res.status(500).json({ error: 'Internal server error' })
@@ -81,7 +82,9 @@ router.put('/:id', async (req: Request<TenantParams & { id: string }>, res: Resp
 
     await professionalRef.update(updates)
 
-    res.json({ id, ...professionalDoc.data(), ...updates })
+    const updatedDoc = await professionalRef.get()
+
+    res.json({ id, ...updatedDoc.data() })
   } catch (error) {
     console.error('Error updating professional:', error)
     res.status(500).json({ error: 'Internal server error' })

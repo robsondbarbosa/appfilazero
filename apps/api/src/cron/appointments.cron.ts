@@ -10,11 +10,15 @@ const tenantsCollection = adminDb.collection('tenants');
 
 export async function cancelExpiredAppointments(): Promise<void> {
   try {
+    console.log('[Cron] Verificando agendamentos expirados...');
+
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const expiredSnapshot = await appointmentsCollection
       .where('status', '==', 'PENDING')
       .where('createdAt', '<=', fifteenMinutesAgo)
       .get();
+
+    console.log(`[Cron] ${expiredSnapshot.size} agendamentos expirados encontrados`);
 
     for (const appointmentDoc of expiredSnapshot.docs) {
       const appointment = appointmentDoc.data();
@@ -55,10 +59,13 @@ export async function cancelExpiredAppointments(): Promise<void> {
           },
           'Não pagamento dentro do prazo de 15 minutos'
         );
+        console.log(`[WhatsApp] Cancelamento notificado: ${appointment.clientPhone}`);
       } catch (notifyError) {
         console.error('[WhatsApp] Erro ao notificar cancelamento:', notifyError);
       }
     }
+
+    console.log(`[Cron] ${expiredSnapshot.size} agendamentos expirados cancelados`);
   } catch (error) {
     console.error('[Cron] Erro ao cancelar agendamentos:', error);
   }
@@ -66,6 +73,8 @@ export async function cancelExpiredAppointments(): Promise<void> {
 
 export async function sendAppointmentReminders(): Promise<void> {
   try {
+    console.log('[Cron] Enviando lembretes de agendamento...');
+
     const now = new Date();
     const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
     const threeHoursFromNow = new Date(now.getTime() + 3 * 60 * 60 * 1000);
@@ -76,6 +85,8 @@ export async function sendAppointmentReminders(): Promise<void> {
       .where('dateTime', '<', threeHoursFromNow)
       .where('reminderSent', '!=', true)
       .get();
+
+    console.log(`[Cron] ${appointmentsSnapshot.size} lembretes para enviar`);
 
     for (const appointmentDoc of appointmentsSnapshot.docs) {
       const appointment = appointmentDoc.data();
@@ -105,10 +116,13 @@ export async function sendAppointmentReminders(): Promise<void> {
           reminderSent: true,
           reminderSentAt: FieldValue.serverTimestamp()
         });
+        console.log(`[WhatsApp] Lembrete enviado: ${appointment.clientPhone}`);
       } catch (notifyError) {
         console.error('[WhatsApp] Erro ao enviar lembrete:', notifyError);
       }
     }
+
+    console.log('[Cron] Lembretes enviados com sucesso');
   } catch (error) {
     console.error('[Cron] Erro ao enviar lembretes:', error);
   }
